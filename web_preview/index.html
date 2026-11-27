@@ -1,0 +1,1823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Taking Your Notes</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%233b5bdb'/%3E%3Cpath d='M20 46l2-8 20-20a4 4 0 0 1 6 6L28 44z' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+/* ============ Design tokens ============ */
+:root {
+  --bg: #e5e8ee; --surface: #ffffff; --surface2: #f1f3f8; --surface3: #e8ebf3;
+  --line: rgba(15, 23, 42, .09); --line2: rgba(15, 23, 42, .16);
+  --text: #0f172a; --text2: #4a5568; --text3: #8792a6;
+  --accent: #3b5bdb; --accent2: #2f4ac0; --accent-soft: rgba(59, 91, 219, .12); --on-accent: #fff;
+  --danger: #e03131; --ok: #2f9e44;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, .08);
+  --shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 10px 32px rgba(15, 23, 42, .16);
+  --ink: #111827;
+  --r: 14px;
+  --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px);
+  --topbar-h: 56px;
+}
+[data-theme="dark"] {
+  --bg: #0d0f14; --surface: #1a1d25; --surface2: #232731; --surface3: #2c3140;
+  --line: rgba(255, 255, 255, .08); --line2: rgba(255, 255, 255, .16);
+  --text: #eef0f6; --text2: #adb4c4; --text3: #7b8498;
+  --accent: #7b93ff; --accent2: #93a6ff; --accent-soft: rgba(123, 147, 255, .16); --on-accent: #0d1020;
+  --danger: #ff6b6b; --ok: #51cf66;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 32px rgba(0, 0, 0, .55);
+}
+
+/* ============ Base ============ */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html, body {
+  height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--text);
+  font: 14px/1.35 system-ui, -apple-system, Roboto, "Segoe UI", "Helvetica Neue", sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+#app { position: fixed; inset: 0; }
+
+.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+.ic .inkfill { fill: var(--ink); } .ic .inkstroke { stroke: var(--ink); }
+.ic .soft { fill: currentColor; fill-opacity: .2; } .ic .solid { fill: currentColor; stroke: none; }
+
+.ibtn {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--text2);
+  transition: background-color .12s, color .12s, transform .12s;
+}
+.ibtn:active { transform: scale(.92); background: var(--surface3); }
+.ibtn:disabled { opacity: .32; pointer-events: none; }
+@media (hover: hover) { .ibtn:hover { background: var(--surface2); color: var(--text); } }
+.ibtn.on { background: var(--accent-soft); color: var(--accent); }
+
+/* ============ Top bar ============ */
+#topbar {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 20; height: calc(var(--topbar-h) + var(--safe-t));
+  padding: var(--safe-t) calc(8px + var(--safe-r)) 0 calc(8px + var(--safe-l));
+  display: flex; align-items: center; gap: 4px; background: var(--surface); border-bottom: 1px solid var(--line);
+  transition: opacity .18s ease, transform .22s cubic-bezier(.2, .8, .2, 1);
+}
+#tabs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 4px; }
+#tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none; max-width: 210px; height: 38px; padding: 0 6px 0 12px; border-radius: 11px; display: flex; align-items: center; gap: 8px;
+  color: var(--text2); font-weight: 500; transition: background-color .12s;
+}
+.tab .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.tab .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab .x { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--text3); }
+.tab .x .ic { width: 15px; height: 15px; stroke-width: 2.2; }
+.tab .x:active { background: var(--surface3); }
+.tab.active { background: var(--surface2); color: var(--text); font-weight: 650; }
+.tab.active .x { color: var(--text2); }
+.tab:not(.active) .x { opacity: .55; }
+#tabs .newtab { flex: none; width: 38px; height: 38px; }
+.tbsep { width: 1px; height: 24px; background: var(--line2); margin: 0 4px; flex: none; }
+.pagechip {
+  height: 38px; padding: 0 12px; border-radius: 11px; background: var(--surface2); display: flex; align-items: baseline; gap: 4px;
+  font-weight: 700; font-variant-numeric: tabular-nums; align-self: center; margin: 0 2px; line-height: 38px;
+}
+.pagechip small { color: var(--text3); font-weight: 600; font-size: 12px; }
+.pagechip:active { background: var(--surface3); }
+.savedot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); margin: 0 6px; opacity: 0; transition: opacity .3s; flex: none; }
+.savedot.show { opacity: 1; }
+.savedot.busy { background: #f59f00; opacity: 1; }
+
+/* ============ Canvas workspace ============ */
+#viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; contain: strict; background: var(--bg); }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; --inv: 1; }
+.page { position: absolute; border-radius: 3px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, .14), 0 8px 28px rgba(0, 0, 0, .10); contain: layout paint style; }
+.page canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+#live { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 7; pointer-events: none; display: none; }
+.addcard {
+  position: absolute; border: calc(2px * var(--inv)) dashed var(--line2); border-radius: 18px; display: flex; align-items: center; justify-content: center; gap: 12px;
+  color: var(--text2); font-size: 22px; font-weight: 650; background: transparent; cursor: pointer; touch-action: manipulation;
+}
+.addcard .ic { width: 28px; height: 28px; stroke-width: 2; }
+.addcard:active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* selection */
+#selbox { position: absolute; z-index: 6; display: none; border: calc(1.6px * var(--inv)) dashed var(--accent); background: var(--accent-soft); pointer-events: none; border-radius: calc(3px * var(--inv)); }
+#selbox .h { position: absolute; right: calc(-11px * var(--inv)); bottom: calc(-11px * var(--inv)); width: calc(22px * var(--inv)); height: calc(22px * var(--inv)); border-radius: 50%; background: var(--surface); border: calc(2.4px * var(--inv)) solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+#selbar { position: absolute; z-index: 15; display: none; gap: 2px; padding: 4px; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); transform: translateX(-50%); }
+#selbar .ibtn { width: 42px; height: 42px; }
+#selbar .ibtn.danger { color: var(--danger); }
+#eraserring { position: absolute; z-index: 8; pointer-events: none; border-radius: 50%; border: 1.5px solid var(--text); background: rgba(128, 128, 128, .12); box-shadow: 0 0 0 1px rgba(255, 255, 255, .7); display: none; left: 0; top: 0; will-change: transform; }
+
+#pagetoast {
+  position: absolute; z-index: 12; left: 50%; top: calc(var(--topbar-h) + var(--safe-t) + 14px); transform: translate(-50%, -6px); pointer-events: none;
+  background: rgba(15, 23, 42, .82); color: #fff; padding: 7px 14px; border-radius: 20px; font-weight: 650; font-variant-numeric: tabular-nums;
+  opacity: 0; transition: opacity .2s, transform .2s;
+}
+#pagetoast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ============ Tool dock ============ */
+#dock {
+  position: absolute; z-index: 20; left: 50%; bottom: calc(14px + var(--safe-b)); transform: translateX(-50%);
+  display: flex; align-items: flex-end; gap: 2px; padding: 8px 8px 0; height: 64px; max-width: calc(100% - 16px);
+  background: var(--surface); border-radius: 24px; box-shadow: var(--shadow); border: 1px solid var(--line);
+  transition: opacity .18s ease, transform .22s cubic-bezier(.2, .8, .2, 1);
+}
+#dock.free { transform: none; bottom: auto; }
+#dock .grip { width: 22px; height: 50px; align-self: center; margin-top: -8px; display: grid; place-items: center; cursor: grab; touch-action: none; color: var(--text3); }
+#dock .grip i { width: 4px; height: 22px; border-radius: 2px; background: currentColor; opacity: .5; box-shadow: 7px 0 0 currentColor; margin-right: 7px; }
+#dock .tools { display: flex; align-items: flex-end; gap: 2px; height: 100%; overflow: hidden; }
+.tool { position: relative; width: 52px; height: 56px; display: grid; place-items: end center; padding-bottom: 6px; color: var(--text2); transition: transform .2s cubic-bezier(.2, .9, .3, 1.2), color .12s; }
+.tool .ic { width: 34px; height: 34px; stroke-width: 1.6; }
+.tool:active { transform: scale(.94); }
+.tool.active { color: var(--accent); transform: translateY(-9px); }
+.tool.active::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 18px; height: 4px; border-radius: 3px; background: var(--accent); transform: translateX(-50%); }
+.dbtn { width: 46px; height: 46px; align-self: center; margin-top: -8px; border-radius: 14px; display: grid; place-items: center; color: var(--text2); transition: background-color .12s, color .12s; position: relative; }
+.dbtn:active { background: var(--surface3); }
+.dbtn.on { background: var(--accent-soft); color: var(--accent); }
+.dbtn .ic { width: 24px; height: 24px; }
+.dbtn .badge { position: absolute; right: 5px; bottom: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+#dock .sep { width: 1px; height: 30px; background: var(--line2); align-self: center; margin: -8px 6px 0; }
+.colorchip { width: 46px; height: 46px; align-self: center; margin-top: -8px; display: grid; place-items: center; border-radius: 14px; }
+.colorchip:active { background: var(--surface3); }
+.colorchip i { width: 30px; height: 30px; border-radius: 50%; background: var(--ink); box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 2px var(--line2); display: block; }
+#dock.collapsed { padding: 6px; height: 56px; gap: 0; }
+#dock.collapsed .tools, #dock.collapsed .sep, #dock.collapsed .grip, #dock.collapsed .dbtn:not(.expander), #dock.collapsed .colorchip { display: none; }
+#dock .expander { display: none; }
+#dock.collapsed .expander { display: grid; margin: 0; align-self: center; }
+body.writing #topbar { opacity: 0; transform: translateY(-14px); pointer-events: none; }
+body.writing #dock { opacity: 0; pointer-events: none; }
+body.writing #dock:not(.free) { transform: translate(-50%, 14px); }
+body.writing #selbar { opacity: 0; pointer-events: none; }
+
+/* ============ Popovers / menus ============ */
+#popover {
+  position: fixed; z-index: 60; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); border: 1px solid var(--line); padding: 14px;
+  min-width: 220px; max-width: min(92vw, 340px); max-height: min(80vh, 640px); overflow: auto; animation: pop .14s ease-out; transform-origin: var(--ox, 50%) var(--oy, 100%);
+}
+@keyframes pop { from { opacity: 0; transform: scale(.94) translateY(var(--dy, 6px)); } }
+#popover.menu { padding: 6px; min-width: 240px; }
+.mi { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; border-radius: 11px; text-align: left; font-weight: 520; color: var(--text); }
+.mi .ic { width: 20px; height: 20px; color: var(--text2); }
+.mi:active { background: var(--surface3); }
+.mi.danger, .mi.danger .ic { color: var(--danger); }
+.mi .sub { margin-left: auto; color: var(--text3); font-size: 12px; font-weight: 500; }
+.mdiv { height: 1px; background: var(--line); margin: 5px 8px; }
+.plabel { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin: 2px 2px 8px; }
+.prow { display: flex; align-items: center; gap: 10px; }
+.preview { height: 54px; border-radius: 12px; background: var(--surface2); margin-bottom: 12px; overflow: hidden; }
+.preview canvas { width: 100%; height: 100%; display: block; }
+.sliderrow { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.sliderrow output { width: 34px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text2); }
+input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 36px; background: transparent; touch-action: pan-x; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--p, 50%), var(--surface3) var(--p, 50%)); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); margin-top: -10px; box-shadow: var(--shadow-sm); }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--surface3); }
+input[type=range]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--surface); border: 3px solid var(--accent); }
+.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.sw { aspect-ratio: 1; border-radius: 50%; background: var(--c); position: relative; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); min-width: 34px; }
+.sw.sel { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14), 0 0 0 2.5px var(--surface), 0 0 0 5px var(--accent); }
+.sw:active { transform: scale(.9); }
+.sw.custom { background: conic-gradient(#f03e3e, #fd7e14, #fcc419, #51cf66, #22b8cf, #4c6ef5, #be4bdb, #f03e3e); display: grid; place-items: center; overflow: hidden; }
+.sw.custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.sw.custom .ic { color: #fff; width: 16px; height: 16px; stroke-width: 2.6; filter: drop-shadow(0 0 2px rgba(0, 0, 0, .5)); pointer-events: none; }
+.seg { display: flex; background: var(--surface2); border-radius: 12px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; padding: 9px 12px; border-radius: 9px; font-weight: 600; color: var(--text2); white-space: nowrap; }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.shapegrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.shapegrid button { display: grid; place-items: center; gap: 4px; padding: 12px 6px 9px; border-radius: 14px; background: var(--surface2); font-size: 12px; font-weight: 600; color: var(--text2); }
+.shapegrid button .ic { width: 28px; height: 28px; }
+.shapegrid button.on { background: var(--accent-soft); color: var(--accent); }
+.hint { color: var(--text3); font-size: 12px; margin-top: 10px; line-height: 1.4; }
+
+/* ============ Modal / sheets ============ */
+#modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; background: rgba(8, 12, 24, .48); animation: fade .16s ease-out; }
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  width: min(100%, 720px); max-height: 88vh; background: var(--surface); border-radius: 26px 26px 0 0; box-shadow: var(--shadow); display: flex; flex-direction: column;
+  animation: rise .22s cubic-bezier(.2, .8, .2, 1); padding-bottom: var(--safe-b);
+}
+@keyframes rise { from { transform: translateY(40px); opacity: 0; } }
+.sheet.dialog { width: min(92%, 440px); border-radius: 24px; align-self: center; margin-bottom: 0; }
+.sheet.wide { width: min(100%, 900px); }
+.sheet-h { display: flex; align-items: center; padding: 14px 12px 6px 22px; gap: 8px; }
+.sheet-h h2 { flex: 1; font-size: 19px; font-weight: 750; letter-spacing: -.01em; }
+.sheet-b { padding: 8px 22px 20px; overflow: auto; overscroll-behavior: contain; }
+.sheet-f { display: flex; justify-content: flex-end; gap: 10px; padding: 8px 22px 18px; }
+.btn { height: 46px; padding: 0 20px; border-radius: 13px; font-weight: 650; background: var(--surface2); color: var(--text); display: inline-flex; align-items: center; gap: 8px; justify-content: center; transition: transform .1s, background-color .12s; }
+.btn:active { transform: scale(.96); }
+.btn.primary { background: var(--accent); color: var(--on-accent); }
+.btn.danger { background: var(--danger); color: #fff; }
+.btn.ghost { background: transparent; }
+.btn .ic { width: 20px; height: 20px; }
+.field { width: 100%; height: 50px; padding: 0 16px; border-radius: 13px; background: var(--surface2); border: 2px solid transparent; outline: none; font-size: 16px; }
+.field:focus { border-color: var(--accent); background: var(--surface); }
+.fl { font-size: 12px; font-weight: 700; color: var(--text3); letter-spacing: .05em; text-transform: uppercase; margin: 18px 0 9px; }
+.fl:first-child { margin-top: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; }
+.tile { display: grid; gap: 6px; justify-items: center; font-weight: 600; font-size: 12.5px; color: var(--text2); }
+.tile canvas { width: 100%; aspect-ratio: 850/1100; border-radius: 8px; box-shadow: 0 0 0 1px var(--line2); display: block; }
+.tile.sel canvas { box-shadow: 0 0 0 3px var(--accent); }
+.tile.sel { color: var(--accent); }
+.papers { display: flex; gap: 12px; flex-wrap: wrap; }
+.papers .sw { width: 44px; min-width: 44px; flex: none; }
+.row-opt { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row-opt:last-child { border-bottom: 0; }
+.row-opt .lbl { flex: 1; } .row-opt .lbl b { display: block; font-weight: 650; } .row-opt .lbl span { color: var(--text3); font-size: 12.5px; }
+.switch { width: 52px; height: 32px; border-radius: 16px; background: var(--surface3); position: relative; flex: none; transition: background-color .15s; }
+.switch::after { content: ""; position: absolute; left: 3px; top: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .18s cubic-bezier(.2, .8, .2, 1); }
+.switch.on { background: var(--accent); } .switch.on::after { transform: translateX(20px); }
+.colorrow { display: flex; gap: 12px; flex-wrap: wrap; }
+.colorrow .sw { width: 38px; min-width: 38px; flex: none; }
+
+/* page overview */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 16px; }
+.pcard { position: relative; display: grid; gap: 7px; justify-items: center; }
+.pcard .th { width: 100%; aspect-ratio: 850/1100; border-radius: 8px; background: var(--surface2); overflow: hidden; box-shadow: 0 0 0 1px var(--line2); position: relative; }
+.pcard .th img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.pcard.cur .th { box-shadow: 0 0 0 3px var(--accent); }
+.pcard .n { font-weight: 700; font-size: 12.5px; color: var(--text2); }
+.pcard.cur .n { color: var(--accent); }
+.pcard .pm { position: absolute; right: 5px; top: 5px; width: 32px; height: 32px; border-radius: 10px; background: rgba(255, 255, 255, .92); color: #334155; display: grid; place-items: center; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.pcard .pm .ic { width: 18px; height: 18px; }
+.pcard.add .th { display: grid; place-items: center; background: transparent; box-shadow: none; border: 2px dashed var(--line2); color: var(--text2); }
+.pcard.add .th .ic { width: 34px; height: 34px; }
+
+/* toasts */
+#toasts { position: fixed; z-index: 100; left: 50%; bottom: calc(100px + var(--safe-b)); transform: translateX(-50%); display: grid; gap: 8px; justify-items: center; pointer-events: none; width: max-content; max-width: 92vw; }
+.toast { pointer-events: auto; background: #1e2433; color: #fff; padding: 12px 14px 12px 18px; border-radius: 16px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow); animation: tin .2s cubic-bezier(.2, .8, .2, 1); font-weight: 520; }
+.toast.out { opacity: 0; transform: translateY(8px); transition: .25s; }
+.toast button { color: #9db0ff; font-weight: 750; padding: 4px 8px; border-radius: 8px; }
+@keyframes tin { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+
+/* ============ Library ============ */
+#library { position: absolute; inset: 0; z-index: 30; background: var(--bg); display: flex; flex-direction: column; animation: fade .15s; }
+.lib-head { padding: calc(14px + var(--safe-t)) calc(24px + var(--safe-r)) 10px calc(24px + var(--safe-l)); background: var(--bg); display: grid; gap: 12px; }
+.lib-title { display: flex; align-items: center; gap: 10px; }
+.lib-title h1 { font-size: 28px; font-weight: 800; letter-spacing: -.02em; flex: 1; }
+.lib-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.search { flex: 1; min-width: 160px; position: relative; }
+.search .ic { position: absolute; left: 14px; top: 13px; width: 20px; height: 20px; color: var(--text3); }
+.search input { width: 100%; height: 46px; border-radius: 14px; background: var(--surface); border: 2px solid transparent; padding: 0 14px 0 44px; outline: none; font-size: 15px; box-shadow: var(--shadow-sm); }
+.search input:focus { border-color: var(--accent); }
+.chips { display: flex; gap: 8px; }
+.chip { height: 38px; padding: 0 16px; border-radius: 19px; background: var(--surface); font-weight: 650; color: var(--text2); box-shadow: var(--shadow-sm); }
+.chip.on { background: var(--text); color: var(--bg); }
+.crumbs:empty { display: none; }
+.crumbs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-weight: 650; color: var(--text2); min-height: 28px; }
+.crumbs button { padding: 4px 8px; border-radius: 8px; color: var(--accent); }
+.crumbs span.cur { padding: 4px 8px; color: var(--text); }
+.crumbs .sep { color: var(--text3); }
+.lib-body { flex: 1; overflow-y: auto; padding: 8px calc(24px + var(--safe-r)) 60px calc(24px + var(--safe-l)); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.lib-sec { font-size: 12px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin: 20px 2px 12px; display: flex; gap: 8px; align-items: center; }
+.fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.fcard { background: var(--surface); border-radius: 18px; padding: 14px 8px 14px 14px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); text-align: left; }
+.fcard:active { transform: scale(.98); }
+.fcard .fi { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: color-mix(in srgb, var(--fc) 18%, transparent); color: var(--fc); flex: none; }
+.fcard .fi .ic { width: 24px; height: 24px; }
+.fcard .ft { flex: 1; min-width: 0; } .fcard b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.fcard small { color: var(--text3); }
+.ngrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 22px 18px; }
+.ncard { display: grid; gap: 10px; text-align: left; }
+.ncard .cover { position: relative; aspect-ratio: 850/1100; border-radius: 6px 12px 12px 6px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .18), 0 10px 24px rgba(0, 0, 0, .12); transition: transform .18s; }
+.ncard:active .cover { transform: scale(.97); }
+.ncard .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ncard .cover::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 11px; background: var(--nc); z-index: 2; }
+.ncard .cover::after { content: ""; position: absolute; left: 11px; top: 0; bottom: 0; width: 3px; background: linear-gradient(90deg, rgba(0, 0, 0, .16), transparent); z-index: 2; }
+.ncard .star { position: absolute; right: 6px; top: 6px; z-index: 3; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: rgba(255, 255, 255, .9); color: #64748b; box-shadow: 0 1px 4px rgba(0, 0, 0, .22); }
+.ncard .star.on { color: #f59f00; } .ncard .star.on .ic { fill: #f59f00; }
+.ncard .star .ic { width: 19px; height: 19px; }
+.ncard .meta { display: flex; align-items: flex-start; gap: 4px; }
+.ncard .meta .tt { flex: 1; min-width: 0; padding-left: 2px; }
+.ncard .meta b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.ncard .meta small { color: var(--text3); font-size: 12px; }
+.ncard .meta .ibtn { width: 34px; height: 34px; margin-top: -4px; }
+.empty { text-align: center; color: var(--text3); padding: 60px 20px; }
+.empty .ic { width: 52px; height: 52px; margin: 0 auto 12px; opacity: .6; stroke-width: 1.3; }
+
+@media (max-width: 640px) {
+  .tab { max-width: 130px; } .pagechip small { display: none; }
+  #dock .grip { display: none; }
+  .tool { width: 46px; } .tool .ic { width: 30px; height: 30px; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+#boot{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--text3);z-index:200;font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar"></header>
+  <main id="viewport">
+    <div id="world"></div>
+    <canvas id="live"></canvas>
+    <div id="eraserring"></div>
+    <div id="selbar"></div>
+  </main>
+  <div id="pagetoast"></div>
+  <nav id="dock"></nav>
+  <section id="library" hidden></section>
+  <div id="popover" hidden></div>
+  <div id="modal" hidden></div>
+  <div id="toasts"></div>
+</div>
+<div id="boot">Loading…</div>
+<script>
+/* ---------- Icon set (custom, 24px grid, 1.7 stroke, round joins) ----------
+   Tool icons are drawn like real instruments; the writing tip takes the current ink colour. */
+const ICONS = {
+  // ── Drawing tools (tip points to bottom-left) ──
+  pen: `<g transform="rotate(45 12 12)">
+      <rect x="9.4" y="-1" width="5.2" height="16.4" rx="2.6"/>
+      <path d="M9.4 15.4h5.2l-.9 4.1L12 22.8l-1.7-3.3z"/>
+      <path class="inkfill" d="M10.75 20.6 12 22.8l1.25-2.2z"/>
+      <path d="M14.6 3.6v4.2"/></g>`,
+  fountain: `<g transform="rotate(45 12 12)">
+      <path d="M9.6 -1h4.8l1 11.3H8.6z"/>
+      <path d="M8.2 10.3h7.6l-.5 4.1L12 22.8l-3.3-8.4z"/>
+      <path d="M12 16.6v6"/>
+      <circle class="inkfill" cx="12" cy="14.9" r="1.05"/></g>`,
+  highlighter: `<g transform="rotate(45 12 12)">
+      <rect x="8" y="-1" width="8" height="11.6" rx="2"/>
+      <path d="M8.5 10.6h7l.8 3.7H7.7z"/>
+      <path class="inkfill" d="M8.1 14.3h7.8l-.9 5.3h-6z"/></g>
+    <path class="inkstroke" d="M2.6 22.4h8.6" stroke-width="2.4"/>`,
+  eraser: `<g transform="rotate(-45 12 12)">
+      <rect x="2.4" y="7.6" width="19.2" height="8.8" rx="2.6"/>
+      <path d="M10.6 7.6v8.8"/>
+      <path class="soft" d="M10.6 7.6h8.4a2.6 2.6 0 0 1 2.6 2.6v3.6a2.6 2.6 0 0 1-2.6 2.6h-8.4z"/></g>
+    <path d="M12.5 21.4h8.6"/>`,
+  lasso: `<path stroke-dasharray="2.3 2.9" d="M12 3.3c4.8 0 8.7 2.5 8.7 5.6s-3.9 5.6-8.7 5.6-8.7-2.5-8.7-5.6S7.2 3.3 12 3.3z"/>
+    <path d="M7.5 13.9c-1.3 1.7-1 3.8.9 4.9 1.7 1 3.6.4 3.6-1.1 0-1.2-1.2-1.7-2.1-1.1"/>`,
+  shapes: `<rect x="3.4" y="11" width="9.2" height="9.2" rx="2"/><circle cx="15.4" cy="8.6" r="5.2"/>`,
+  sparkle: `<path d="M10.2 3.4l1.9 5.2 5.2 1.9-5.2 1.9-1.9 5.2-1.9-5.2-5.2-1.9 5.2-1.9z"/>
+    <path d="M18.4 14.6l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z"/>`,
+
+  // ── Shapes ──
+  s_free: `<path d="M3.5 15.5c2.5-7 4.5-8 6.2-4.2s3.6 3.6 5.3-1.4 3-2.6 5.5 4.6"/>`,
+  s_line: `<path d="M4.5 19.5 19.5 4.5"/>`,
+  s_rect: `<rect x="4" y="6" width="16" height="12" rx="2"/>`,
+  s_ellipse: `<ellipse cx="12" cy="12" rx="8.5" ry="6.4"/>`,
+  s_triangle: `<path d="M12 4.6 20.2 19H3.8z"/>`,
+  s_arrow: `<path d="M4.5 19.5 19 5M9.5 5H19v9.5"/>`,
+
+  // ── Actions ──
+  undo: `<path d="M9 14 4.5 9.5 9 5"/><path d="M4.5 9.5h9.2a6 6 0 0 1 0 12H10"/>`,
+  redo: `<path d="m15 14 4.5-4.5L15 5"/><path d="M19.5 9.5h-9.2a6 6 0 0 0 0 12H14"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  close: `<path d="M6 6l12 12M18 6 6 18"/>`,
+  check: `<path d="m5 12.5 4.5 4.5L19 7.5"/>`,
+  chevL: `<path d="m14.5 6-6 6 6 6"/>`,
+  chevR: `<path d="m9.5 6 6 6-6 6"/>`,
+  chevD: `<path d="m6 9.5 6 6 6-6"/>`,
+  chevU: `<path d="m6 14.5 6-6 6 6"/>`,
+  more: `<circle cx="5.5" cy="12" r="1.5" class="solid"/><circle cx="12" cy="12" r="1.5" class="solid"/><circle cx="18.5" cy="12" r="1.5" class="solid"/>`,
+  library: `<rect x="3.5" y="3.5" width="7.2" height="7.2" rx="2"/><rect x="13.3" y="3.5" width="7.2" height="7.2" rx="2"/><rect x="3.5" y="13.3" width="7.2" height="7.2" rx="2"/><rect x="13.3" y="13.3" width="7.2" height="7.2" rx="2"/>`,
+  pages: `<rect x="7.5" y="3" width="13" height="16" rx="2.2"/><path d="M4.5 7.5v11a2.5 2.5 0 0 0 2.5 2.5h9"/>`,
+  trash: `<path d="M4.5 7h15M9.5 7V4.5h5V7M6.8 7l.8 12.2a1.5 1.5 0 0 0 1.5 1.3h5.8a1.5 1.5 0 0 0 1.5-1.3L17.2 7M10 11v6M14 11v6"/>`,
+  copy: `<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.4"/><path d="M15.5 8.5V6.4A2.4 2.4 0 0 0 13.1 4H6.4A2.4 2.4 0 0 0 4 6.4v6.7a2.4 2.4 0 0 0 2.4 2.4h2.1"/>`,
+  download: `<path d="M12 4v11m0 0 4.2-4.2M12 15l-4.2-4.2M4.5 19.5h15"/>`,
+  upload: `<path d="M12 15V4m0 0L7.8 8.2M12 4l4.2 4.2M4.5 19.5h15"/>`,
+  file: `<path d="M14 3.5H7.5A2 2 0 0 0 5.5 5.5v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h6"/>`,
+  image: `<rect x="3.5" y="4.5" width="17" height="15" rx="2.4"/><circle cx="9" cy="10" r="1.7"/><path d="m4 17.5 5-4.5 4 3.5 2.5-2 4.5 3.5"/>`,
+  star: `<path d="m12 3.6 2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/>`,
+  folder: `<path d="M3.5 7.6a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>`,
+  folderPlus: `<path d="M3.5 7.6a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11.2v5M9.5 13.7h5"/>`,
+  move: `<path d="M3.5 7.6a2 2 0 0 1 2-2h4l2 2.3h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M9 13.7h6m0 0-2-2m2 2-2 2"/>`,
+  search: `<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.6 15.6 4.4 4.4"/>`,
+  full: `<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>`,
+  exitfull: `<path d="M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20M4 15h3.5A1.5 1.5 0 0 1 9 16.5V20"/>`,
+  paper: `<path d="M6.5 3.5h8l4 4v11a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M8.5 11.5h7M8.5 15h7"/>`,
+  gear: `<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18"/>`,
+  hide: `<path d="M3.5 12s3.2-6 8.5-6 8.5 6 8.5 6-3.2 6-8.5 6-8.5-6-8.5-6z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 4l16 16"/>`,
+  help: `<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8M12 16.8v.2"/>`,
+  zoomIn: `<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.6 15.6 4.4 4.4M10.8 8.3v5M8.3 10.8h5"/>`,
+  zoomOut: `<circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.6 15.6 4.4 4.4M8.3 10.8h5"/>`,
+  rename: `<path d="M4.5 19.5h4l10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m13.8 7.7 2.5 2.5"/>`,
+  palette: `<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-.9-.6-1.3-.6-2.2 0-1 .8-1.7 1.8-1.7H17a3.5 3.5 0 0 0 3.5-3.5C20.5 6.7 16.7 3.5 12 3.5z"/><circle cx="7.8" cy="11.2" r="1.1" class="solid"/><circle cx="10.4" cy="7.4" r="1.1" class="solid"/><circle cx="14.6" cy="7.4" r="1.1" class="solid"/>`,
+  logo: `<path d="M5.5 18.5 7 13.6 16.4 4.2a2.2 2.2 0 0 1 3.1 3.1L10.1 16.7z"/><path d="m14.6 6 3.4 3.4"/><path d="M4 21h8" />`,
+  fit: `<path d="M8 4H5.5A1.5 1.5 0 0 0 4 5.5V8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><rect x="8.5" y="8.5" width="7" height="7" rx="1.2"/>`,
+  hand: `<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11m0-4.5v-1a1.5 1.5 0 0 1 3 0V11m0-4a1.5 1.5 0 0 1 3 0v6.5c0 4-2.5 6.5-6 6.5-2.5 0-4-1.2-5.4-3.4L4 13.2a1.5 1.5 0 0 1 2.4-1.7L8 13"/>`,
+};
+
+function ic(name, cls = '') {
+  return `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+
+'use strict';
+/* ============================================================
+   CORE — constants, helpers, paper templates, stroke renderer,
+   shape recognition and the IndexedDB storage layer.
+   ============================================================ */
+const PAGE_W = 850, PAGE_H = 1100;             // page units (unchanged → old notes still fit)
+const GAP = 34, SIDE = 22, TOP_PAD = 88, ADD_H = 150, BOTTOM_PAD = 190;
+const WORLD_W = PAGE_W + SIDE * 2;
+const pageTop = i => TOP_PAD + i * (PAGE_H + GAP);
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const r1 = v => Math.round(v * 10) / 10;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  if (props) for (const k in props) {
+    const v = props[k];
+    if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) { if (kid == null || kid === false) continue; el.append(kid.nodeType ? kid : document.createTextNode(kid)); }
+  return el;
+}
+function ago(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago'; if (s < 86400 * 7) return Math.floor(s / 86400) + ' d ago';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/* ---------- Paper & templates ---------- */
+const PAPERS = ['#ffffff', '#faf7ee', '#f4ecd8', '#1e232a', '#0f1b33'];
+const PAPER_NAMES = { '#ffffff': 'White', '#faf7ee': 'Ivory', '#f4ecd8': 'Sepia', '#1e232a': 'Graphite', '#0f1b33': 'Midnight' };
+const TEMPLATES = [
+  { id: 'lined', name: 'Ruled' }, { id: 'grid', name: 'Grid' }, { id: 'dotted', name: 'Dots' },
+  { id: 'cornell', name: 'Cornell' }, { id: 'planner', name: 'Planner' }, { id: 'blank', name: 'Blank' },
+];
+function isDark(hex) {
+  const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 < 0.42;
+}
+
+function drawTemplate(ctx, type, paper) {
+  const w = PAGE_W, hh = PAGE_H, dark = isDark(paper);
+  const line = dark ? 'rgba(255,255,255,.13)' : 'rgba(30,41,59,.14)';
+  const accent = dark ? 'rgba(251,113,133,.34)' : 'rgba(244,63,94,.28)';
+  ctx.save(); ctx.lineWidth = 1; ctx.lineCap = 'butt';
+  const hl = y => { ctx.moveTo(0, y); ctx.lineTo(w, y); }, vl = x => { ctx.moveTo(x, 0); ctx.lineTo(x, hh); };
+  if (type === 'lined') {
+    ctx.strokeStyle = accent; ctx.beginPath(); vl(80); ctx.stroke();
+    ctx.strokeStyle = line; ctx.beginPath(); for (let y = 80; y < hh; y += 36) hl(y + .5); ctx.stroke();
+  } else if (type === 'grid') {
+    ctx.strokeStyle = line; ctx.lineWidth = .8; ctx.beginPath();
+    for (let x = 28; x < w; x += 28) vl(x + .5); for (let y = 28; y < hh; y += 28) hl(y + .5); ctx.stroke();
+  } else if (type === 'dotted') {
+    ctx.fillStyle = dark ? 'rgba(255,255,255,.26)' : 'rgba(30,41,59,.28)';
+    for (let y = 28; y < hh; y += 28) for (let x = 28; x < w; x += 28) { ctx.beginPath(); ctx.arc(x, y, 1.35, 0, 6.2832); ctx.fill(); }
+  } else if (type === 'cornell') {
+    const cue = w * .28, sum = hh - 160;
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.beginPath();
+    ctx.moveTo(0, 70); ctx.lineTo(w, 70); ctx.moveTo(cue, 70); ctx.lineTo(cue, sum); ctx.moveTo(0, sum); ctx.lineTo(w, sum); ctx.stroke();
+    ctx.strokeStyle = line; ctx.lineWidth = .9; ctx.beginPath(); for (let y = 104; y < sum; y += 34) { ctx.moveTo(cue, y + .5); ctx.lineTo(w, y + .5); } ctx.stroke();
+  } else if (type === 'planner') {
+    ctx.strokeStyle = accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(40, 78); ctx.lineTo(w - 40, 78); ctx.stroke();
+    ctx.strokeStyle = line; ctx.lineWidth = 1.2;
+    for (let y = 128; y < hh - 50; y += 46) {
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(56, y - 17, 20, 20, 5) : ctx.rect(56, y - 17, 20, 20); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(92, y + 2.5); ctx.lineTo(w - 48, y + 2.5); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ---------- Strokes ----------
+   stroke = { id?, tool:'pen'|'fountain'|'highlighter', color, width, v:2, points:[{x,y,p?}], isShape?, isClosed? }
+   Legacy strokes (v undefined) still render exactly as before. */
+const BB = new WeakMap();
+function bboxOf(st) {
+  let b = BB.get(st); if (b) return b;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of st.points) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
+  const pad = strokeWidthOf(st) * 1.1 + 1.5;
+  b = { x0: x0 - pad, y0: y0 - pad, x1: x1 + pad, y1: y1 + pad }; BB.set(st, b); return b;
+}
+const hitsRect = (b, r) => !(b.x1 < r.x0 || b.x0 > r.x1 || b.y1 < r.y0 || b.y0 > r.y1);
+function strokeWidthOf(st) { return st.tool === 'highlighter' ? st.width * (st.v >= 2 ? 1 : 2.8) : st.width; }
+function pressW(tool, p) { if (p == null) return 1; return tool === 'fountain' ? .32 + 1.36 * p : .72 + .56 * p; }
+const hasVar = st => st.points.length > 2 && st.points[1].p !== undefined && st.tool !== 'highlighter' && !st.isShape;
+
+function smoothPath(ctx, pts, closed) {
+  const n = pts.length; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y);
+  if (n === 2) ctx.lineTo(pts[1].x, pts[1].y);
+  else { for (let i = 1; i < n - 1; i++) ctx.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2); ctx.lineTo(pts[n - 1].x, pts[n - 1].y); }
+  if (closed) ctx.closePath();
+}
+function varSeg(ctx, pts, i, base, tool) {       // one variable-width segment around point i (1..n-2)
+  const a = pts[i - 1], b = pts[i], c = pts[i + 1];
+  ctx.lineWidth = Math.max(.4, base * pressW(tool, b.p));
+  ctx.beginPath();
+  ctx.moveTo(i === 1 ? a.x : (a.x + b.x) / 2, i === 1 ? a.y : (a.y + b.y) / 2);
+  ctx.quadraticCurveTo(b.x, b.y, (b.x + c.x) / 2, (b.y + c.y) / 2); ctx.stroke();
+}
+function varTail(ctx, pts, base, tool) {
+  const n = pts.length, a = pts[n - 2], b = pts[n - 1];
+  ctx.lineWidth = Math.max(.4, base * pressW(tool, b.p)); ctx.beginPath();
+  ctx.moveTo(n > 2 ? (a.x + pts[n - 3].x) / 2 : a.x, n > 2 ? (a.y + pts[n - 3].y) / 2 : a.y);
+  ctx.lineTo(b.x, b.y); ctx.stroke();
+}
+function styleFor(ctx, st, o) {
+  const hl = st.tool === 'highlighter';
+  ctx.strokeStyle = ctx.fillStyle = st.color;
+  ctx.lineCap = hl && !st.isShape ? 'square' : 'round'; ctx.lineJoin = hl ? 'bevel' : 'round';
+  ctx.globalAlpha = hl && !o.live ? .38 : 1;
+  ctx.globalCompositeOperation = hl && !o.live && !o.dark ? 'multiply' : 'source-over';
+}
+/* o = { dark, live } ;  from = first segment index to draw (live incremental), final = include tail */
+function drawStroke(ctx, st, o = {}, from = 1, final = true) {
+  const pts = st.points, n = pts.length; if (!n) return;
+  const base = strokeWidthOf(st);
+  ctx.save(); styleFor(ctx, st, o);
+  if (n === 1) {
+    ctx.beginPath(); ctx.arc(pts[0].x, pts[0].y, Math.max(.4, base * pressW(st.tool, pts[0].p) / 2), 0, 6.2832); ctx.fill();
+  } else if (hasVar(st)) {
+    ctx.lineWidth = base; for (let i = Math.max(1, from); i < n - 1; i++) varSeg(ctx, pts, i, base, st.tool);
+    if (final) varTail(ctx, pts, base, st.tool);
+  } else {
+    ctx.lineWidth = base;
+    if (st.isShape) { ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < n; i++) ctx.lineTo(pts[i].x, pts[i].y); if (st.isClosed) ctx.closePath(); ctx.stroke(); }
+    else { smoothPath(ctx, pts, st.isClosed); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function renderPage(ctx, page, nb, o = {}) {      // ctx transform already maps page units → pixels
+  const paper = page.paperColor || nb.paperColor, tpl = page.template || nb.template, dark = isDark(paper);
+  ctx.save();
+  if (o.rect) { ctx.beginPath(); ctx.rect(o.rect.x0, o.rect.y0, o.rect.x1 - o.rect.x0, o.rect.y1 - o.rect.y0); ctx.clip(); }
+  ctx.fillStyle = paper; ctx.fillRect(0, 0, PAGE_W, PAGE_H);
+  drawTemplate(ctx, tpl, paper);
+  const so = { dark };
+  for (const st of page.strokes) {
+    if (o.skip && o.skip.has(st)) continue;
+    if (o.rect && !hitsRect(bboxOf(st), o.rect)) continue;
+    drawStroke(ctx, st, so);
+  }
+  ctx.restore();
+}
+
+/* ---------- Hit testing / erasing ---------- */
+function segDist2(px, py, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+  let t = l2 ? ((px - a.x) * dx + (py - a.y) * dy) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const x = a.x + t * dx - px, y = a.y + t * dy - py; return x * x + y * y;
+}
+function strokeHit(st, q, r) {
+  const b = bboxOf(st); if (q.x < b.x0 - r || q.x > b.x1 + r || q.y < b.y0 - r || q.y > b.y1 + r) return false;
+  const rr = r + strokeWidthOf(st) * .5, r2 = rr * rr, pts = st.points;
+  if (pts.length === 1) return (pts[0].x - q.x) ** 2 + (pts[0].y - q.y) ** 2 <= r2;
+  for (let i = 0; i < pts.length - 1; i++) if (segDist2(q.x, q.y, pts[i], pts[i + 1]) <= r2) return true;
+  return false;
+}
+function splitStroke(st, q, r) {                 // precise eraser: cut out the part inside the circle
+  const pts = [], lim = Math.max(2, r * .5);
+  for (let i = 0; i < st.points.length; i++) {
+    const p = st.points[i]; pts.push(p);
+    const nx = st.points[i + 1]; if (!nx) break;
+    const d = dist(p, nx), k = Math.floor(d / lim);
+    for (let j = 1; j <= k; j++) { const t = j / (k + 1); pts.push({ x: p.x + (nx.x - p.x) * t, y: p.y + (nx.y - p.y) * t, ...(p.p !== undefined ? { p: p.p } : {}) }); }
+  }
+  const out = []; let run = [];
+  for (const p of pts) { if (Math.hypot(p.x - q.x, p.y - q.y) > r) run.push(p); else { if (run.length) out.push(run); run = []; } }
+  if (run.length) out.push(run);
+  return out.filter(rn => rn.length > 1).map(rn => ({ ...st, id: uid(), points: rn, isShape: false, isClosed: false }));
+}
+
+/* ---------- Shapes ---------- */
+function shapePoints(type, a, b, width) {
+  const P = (x, y) => ({ x, y }); let pts = [], closed = false;
+  if (type === 'line') pts = [P(a.x, a.y), P(b.x, b.y)];
+  else if (type === 'rect') { closed = true; pts = [P(a.x, a.y), P(b.x, a.y), P(b.x, b.y), P(a.x, b.y)]; }
+  else if (type === 'ellipse') {
+    closed = true; const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2;
+    for (let i = 0; i < 64; i++) { const t = i / 64 * 6.28319; pts.push(P(cx + rx * Math.cos(t), cy + ry * Math.sin(t))); }
+  } else if (type === 'triangle') {
+    closed = true; pts = [P((a.x + b.x) / 2, Math.min(a.y, b.y)), P(Math.max(a.x, b.x), Math.max(a.y, b.y)), P(Math.min(a.x, b.x), Math.max(a.y, b.y))];
+  } else if (type === 'arrow') {
+    const ang = Math.atan2(b.y - a.y, b.x - a.x), wl = Math.max(20, width * 4.5);
+    pts = [P(a.x, a.y), P(b.x, b.y), P(b.x - wl * Math.cos(ang - .5), b.y - wl * Math.sin(ang - .5)), P(b.x, b.y), P(b.x - wl * Math.cos(ang + .5), b.y - wl * Math.sin(ang + .5))];
+  }
+  return { pts, closed };
+}
+function recognizeShape(raw) {                   // returns {type, a, b} or null — used by "hold to snap" and Magic pen
+  const n = raw.length; if (n < 6) return null;
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, L = 0;
+  for (let i = 0; i < n; i++) {
+    const p = raw[i]; x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+    if (i) L += dist(raw[i - 1], p);
+  }
+  const w = x1 - x0, hh = y1 - y0, d = dist(raw[0], raw[n - 1]);
+  if (L < 36) return null;
+  if (d / L > .9) {                                // straight line (snap to axis when nearly aligned)
+    let a = { x: raw[0].x, y: raw[0].y }, b = { x: raw[n - 1].x, y: raw[n - 1].y };
+    const ang = Math.atan2(b.y - a.y, b.x - a.x) * 57.2958, m = ((ang % 90) + 90) % 90;
+    if (m < 4 || m > 86) { if (Math.abs(b.x - a.x) > Math.abs(b.y - a.y)) b.y = a.y; else b.x = a.x; }
+    return { type: 'line', a, b };
+  }
+  if (d < Math.max(34, L * .2) && w > 24 && hh > 24) {
+    let A = 0; for (let i = 0; i < n; i++) { const p = raw[i], q = raw[(i + 1) % n]; A += p.x * q.y - q.x * p.y; }
+    A = Math.abs(A) / 2; const ratio = A / (w * hh);
+    const ra = w / 2, rb = hh / 2, ellP = Math.PI * (3 * (ra + rb) - Math.sqrt((3 * ra + rb) * (ra + 3 * rb)));
+    const bb = { a: { x: x0, y: y0 }, b: { x: x1, y: y1 } };
+    if (ratio > .86 && L / (2 * (w + hh)) > .82) return { type: 'rect', ...bb };
+    if (ratio > .66 && ratio <= .86 && L / ellP > .8 && L / ellP < 1.3) {
+      if (Math.abs(w - hh) / Math.max(w, hh) < .14) { const s = (w + hh) / 2, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2; return { type: 'ellipse', a: { x: cx - s / 2, y: cy - s / 2 }, b: { x: cx + s / 2, y: cy + s / 2 } }; }
+      return { type: 'ellipse', ...bb };
+    }
+    if (ratio > .34 && ratio < .62) return { type: 'triangle', ...bb };
+  }
+  return null;
+}
+function smoothPoints(raw) {                     // light moving-average used by Magic pen
+  if (raw.length < 5) return raw; const out = [raw[0]];
+  for (let i = 1; i < raw.length - 1; i++) {
+    const a = raw[i - 1], b = raw[i], c = raw[i + 1], q = { x: (a.x + 2 * b.x + c.x) / 4, y: (a.y + 2 * b.y + c.y) / 4 };
+    if (b.p !== undefined) q.p = (a.p + 2 * b.p + c.p) / 4; out.push(q);
+  }
+  out.push(raw[raw.length - 1]); return out;
+}
+
+/* ============================================================
+   STORAGE — IndexedDB (fast, large). Pages are stored one-by-one
+   so a pen stroke only rewrites the page that changed.
+   ============================================================ */
+const Store = {
+  idb: null, ls: null,
+  async init() {
+    try {
+      this.idb = await new Promise((res, rej) => {
+        const r = indexedDB.open('notetab_v4', 1);
+        r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('nb', { keyPath: 'id' }); d.createObjectStore('pg', { keyPath: 'id' }); d.createObjectStore('kv', { keyPath: 'k' }); };
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+      });
+    } catch (e) { console.warn('IndexedDB unavailable, using localStorage fallback', e); this.idb = null; }
+    try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
+  },
+  _all(store) { return new Promise((res, rej) => { const r = this.idb.transaction(store).objectStore(store).getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async loadAll() {
+    if (!this.idb) { try { this.ls = JSON.parse(localStorage.getItem('nt4_fallback') || 'null') || { nbs: [], pages: [], folders: [] }; } catch (e) { this.ls = { nbs: [], pages: [], folders: [] }; } return this.ls; }
+    const [nbs, pages, kv] = await Promise.all([this._all('nb'), this._all('pg'), this._all('kv')]);
+    const f = kv.find(x => x.k === 'folders'); return { nbs, pages, folders: f ? f.v : [], hasData: nbs.length > 0 || !!f };
+  },
+  async save({ nbs = [], pages = [], delNbs = [], delPages = [], folders = null }) {
+    if (!this.idb) {
+      const d = this.ls || { nbs: [], pages: [], folders: [] };
+      nbs.forEach(n => { d.nbs = d.nbs.filter(x => x.id !== n.id); d.nbs.push(n); });
+      pages.forEach(p => { d.pages = d.pages.filter(x => x.id !== p.id); d.pages.push(p); });
+      d.nbs = d.nbs.filter(n => !delNbs.includes(n.id)); d.pages = d.pages.filter(p => !delPages.includes(p.id) && !delNbs.includes(p.nbId));
+      if (folders) d.folders = folders; this.ls = d; localStorage.setItem('nt4_fallback', JSON.stringify(d)); return;
+    }
+    return new Promise((res, rej) => {
+      const tx = this.idb.transaction(['nb', 'pg', 'kv'], 'readwrite'), nb = tx.objectStore('nb'), pg = tx.objectStore('pg'), kv = tx.objectStore('kv');
+      nbs.forEach(n => nb.put(n)); pages.forEach(p => pg.put(p));
+      delNbs.forEach(id => nb.delete(id)); delPages.forEach(id => pg.delete(id));
+      if (folders) kv.put({ k: 'folders', v: folders });
+      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+    });
+  },
+};
+
+/* Convert whatever was saved by the old versions into the new model */
+function migrateLegacy() {
+  let nbsRaw, foldersRaw;
+  try { nbsRaw = JSON.parse(localStorage.getItem('notewise_tab_notes_db_v3') || 'null'); foldersRaw = JSON.parse(localStorage.getItem('notewise_folders_db_v1') || 'null'); } catch (e) { return null; }
+  if (!Array.isArray(nbsRaw) || !nbsRaw.length) return null;
+  const fixPaper = c => c || '#ffffff';
+  const notebooks = nbsRaw.map(o => ({
+    id: o.id || uid(), title: o.title || 'Untitled', folderId: o.folderId || null, color: o.color || '#3b5bdb', template: o.template || 'lined',
+    paperColor: fixPaper(o.paperColor), isFavorite: !!o.isFavorite, createdAt: Date.now(), updatedAt: Date.now(), openedAt: 0,
+    pages: (o.pages && o.pages.length ? o.pages : [[]]).map(st => ({ id: uid(), strokes: (Array.isArray(st) ? st : []).filter(s => s && s.points && s.points.length) })),
+  }));
+  return { notebooks, folders: Array.isArray(foldersRaw) ? foldersRaw.map(f => ({ id: f.id, name: f.name, parentFolderId: f.parentFolderId || null, color: f.color || '#3b5bdb', createdAt: f.createdAt || Date.now() })) : [] };
+}
+
+'use strict';
+/* ============================================================
+   EDITOR — state, persistence, the pannable/zoomable page world,
+   pointer input (pen / finger / mouse) and the drawing tools.
+   ============================================================ */
+const S = {
+  folders: [], notebooks: [], tabs: [], activeId: null, views: {},
+  tool: 'pen', shape: 'none', magic: false, penSeen: false,
+  tools: {
+    pen: { color: '#111827', width: 3 }, fountain: { color: '#1d4ed8', width: 4 },
+    highlighter: { color: '#ffe066', width: 18 }, eraser: { width: 28, mode: 'stroke' },
+  },
+  recent: [],
+  prefs: { drawWith: 'auto', autoHide: true, holdSnap: true, theme: 'system', tipsSeen: false },
+  dock: { collapsed: false, x: null, y: null },
+};
+const getNb = id => S.notebooks.find(n => n.id === id);
+const metaOf = n => ({ id: n.id, title: n.title, folderId: n.folderId, color: n.color, template: n.template, paperColor: n.paperColor, isFavorite: n.isFavorite, createdAt: n.createdAt, updatedAt: n.updatedAt, openedAt: n.openedAt || 0, pageIds: n.pages.map(p => p.id) });
+const newPage = (o = {}) => ({ id: uid(), strokes: [], ...o });
+const newNotebook = (o = {}) => ({ id: uid(), title: 'Untitled', folderId: null, color: '#3b5bdb', template: 'lined', paperColor: '#ffffff', isFavorite: false, createdAt: Date.now(), updatedAt: Date.now(), openedAt: Date.now(), pages: [newPage()], ...o });
+
+/* ---------- Persistence (debounced, only dirty pages are written) ---------- */
+const Persist = {
+  pages: new Map(), nbs: new Set(), delNbs: new Set(), delPages: new Set(), folders: false, timer: 0, busy: false,
+  page(nb, p) { this.pages.set(p.id, [nb.id, p]); this.delPages.delete(p.id); nb.updatedAt = Date.now(); this.nbs.add(nb.id); this.kick(); },
+  nb(nb) { this.nbs.add(nb.id); this.kick(); },
+  fol() { this.folders = true; this.kick(); },
+  kick() { UI.saving(true); clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), 650); },
+  async flush() {
+    clearTimeout(this.timer);
+    if (!this.pages.size && !this.nbs.size && !this.delNbs.size && !this.delPages.size && !this.folders) return;
+    const pages = [...this.pages.values()].map(([nbId, p]) => ({ id: p.id, nbId, strokes: p.strokes, template: p.template, paperColor: p.paperColor }));
+    const nbs = [...this.nbs].map(id => getNb(id)).filter(Boolean).map(metaOf);
+    const delNbs = [...this.delNbs], delPages = [...this.delPages], folders = this.folders ? S.folders.map(f => ({ ...f })) : null;
+    this.pages.clear(); this.nbs.clear(); this.delNbs.clear(); this.delPages.clear(); this.folders = false;
+    try { await Store.save({ pages, nbs, delNbs, delPages, folders }); UI.saving(false); }
+    catch (e) { console.error('save failed', e); UI.saving(false, true); }
+  },
+};
+addEventListener('pagehide', () => Persist.flush()); document.addEventListener('visibilitychange', () => { if (document.hidden) { Persist.flush(); Ed.saveView(); UI.saveUiState(); } });
+
+/* ============================================================
+   Editor
+   ============================================================ */
+const Ed = {
+  nb: null, pvs: [], view: { s: 1, tx: 0, ty: 0, fit: true }, vw: 0, vh: 0, rect: { left: 0, top: 0 }, dpr: Math.min(window.devicePixelRatio || 1, 2.5),
+  liveR: 0, cur: 0, hists: {}, writingT: 0, settleT: 0,
+
+  init() {
+    this.vp = $('#viewport'); this.world = $('#world'); this.live = $('#live'); this.lctx = this.live.getContext('2d');
+    this.ring = $('#eraserring');
+    this.addcard = h('div', { class: 'addcard', onclick: () => this.addPage(), html: ic('plus') + '<span>Add page</span>' });
+    this.world.append(this.addcard);
+    new ResizeObserver(() => this.onResize()).observe(this.vp);
+    Input.init();
+  },
+  measure() { const r = this.vp.getBoundingClientRect(); this.rect = r; this.vw = r.width; this.vh = r.height; },
+  onResize() {
+    this.measure(); if (!this.nb) return;
+    if (this.view.fit) { const keep = -this.view.ty / this.view.s; this.view.s = this.fitScale(); this.view.ty = -keep * this.view.s; }
+    this.clampView(); this.applyView(); this.updateVisible(true); UI.onResize && UI.onResize();
+  },
+
+  /* ----- notebook / pages ----- */
+  mount(nb) {
+    this.saveView(); Sel.clear(); this.nb = nb; this.measure();
+    this.pvs.forEach(pv => pv.el.remove()); this.pvs = []; this.syncPages();
+    const sv = S.views[nb.id];
+    const v = { s: this.fitScale(), tx: 0, ty: 0, fit: true };
+    if (sv && !sv.fit) { v.s = clamp(sv.s, this.minS(), 6); v.fit = false; v.tx = -(sv.leftX || 0) * v.s; }
+    v.ty = -((sv && sv.topY) || 0) * v.s; this.view = v;
+    this.clampView(); this.applyView(); this.updateVisible(true); this.curPage(true);
+    UI.onPagesChanged(); UI.updateHist(); UI.syncInk();
+  },
+  saveView() { if (!this.nb) return; const v = this.view; S.views[this.nb.id] = { s: v.s, fit: v.fit, topY: -v.ty / v.s, leftX: -v.tx / v.s }; },
+  paperOf(page) { return page.paperColor || this.nb.paperColor; },
+  makePV(page) {
+    const el = h('div', { class: 'page' }); el.style.cssText = `width:${PAGE_W}px;height:${PAGE_H}px;left:${SIDE}px;`;
+    this.world.insertBefore(el, this.addcard); return { page, el, canvas: null, ctx: null, R: 0 };
+  },
+  syncPages() {
+    const old = new Map(this.pvs.map(pv => [pv.page.id, pv])), next = [];
+    for (const p of this.nb.pages) { let pv = old.get(p.id); if (pv) old.delete(p.id); else pv = this.makePV(p); next.push(pv); }
+    old.forEach(pv => pv.el.remove()); this.pvs = next; this.layout();
+  },
+  layout() {
+    const n = this.pvs.length;
+    this.pvs.forEach((pv, i) => { pv.el.style.top = pageTop(i) + 'px'; pv.el.style.background = this.paperOf(pv.page); });
+    this.worldH = pageTop(n) + ADD_H + BOTTOM_PAD;
+    this.world.style.width = WORLD_W + 'px'; this.world.style.height = this.worldH + 'px';
+    this.addcard.style.cssText = `left:${SIDE}px;top:${pageTop(n)}px;width:${PAGE_W}px;height:${ADD_H - 34}px;`;
+  },
+  pvOf(page) { return this.pvs.find(pv => pv.page === page); },
+
+  /* ----- canvases (virtualised: only pages near the screen hold a bitmap) ----- */
+  needR() { return clamp(Math.ceil(this.view.s * this.dpr * 4) / 4, 1, 2.5); },
+  alloc(pv, R) {
+    if (!pv.canvas) { pv.canvas = document.createElement('canvas'); pv.el.appendChild(pv.canvas); pv.ctx = pv.canvas.getContext('2d'); }
+    const W = Math.round(PAGE_W * R), H = Math.round(PAGE_H * R); pv.canvas.width = W; pv.canvas.height = H; pv.R = W / PAGE_W; this.paint(pv);
+  },
+  release(pv) { if (!pv.canvas) return; pv.canvas.width = 1; pv.canvas.remove(); pv.canvas = null; pv.ctx = null; pv.R = 0; },
+  paint(pv, rect) {
+    if (!pv.ctx) return; pv.ctx.setTransform(pv.R, 0, 0, pv.R, 0, 0);
+    renderPage(pv.ctx, pv.page, this.nb, { rect, skip: Sel.hidden });
+  },
+  invalidate(page, rect) { const pv = this.pvOf(page); page._rev = (page._rev || 0) + 1; if (pv && pv.canvas) this.paint(pv, rect); UI.thumbDirty && UI.thumbDirty(page); },
+  updateVisible(settle) {
+    const v = this.view, top = -v.ty / v.s, bot = top + this.vh / v.s, m = (this.vh / v.s) * .5, R = this.needR();
+    this.pvs.forEach((pv, i) => {
+      const y0 = pageTop(i), y1 = y0 + PAGE_H;
+      if (y1 > top - m && y0 < bot + m) { if (!pv.canvas) this.alloc(pv, R); else if (settle && (pv.R < R * .85 || pv.R > R * 2.2)) this.alloc(pv, R); }
+      else if (pv.canvas) this.release(pv);
+    });
+  },
+  settleSoon() { clearTimeout(this.settleT); this.settleT = setTimeout(() => this.updateVisible(true), 170); },
+  /* Live ink layer: one viewport-sized canvas in SCREEN space (cheap, always crisp). Strokes are drawn
+     through the current view transform and clipped to the page being written on. */
+  ensureLive() {
+    const k = this.dpr, W = Math.round(this.vw * k), H = Math.round(this.vh * k), l = this.live;
+    if (l.width !== W || l.height !== H) { l.width = W; l.height = H; } this.liveK = l.width / Math.max(1, this.vw);
+  },
+  setLiveXform(i) { const v = this.view, k = this.liveK; this.lctx.setTransform(k * v.s, 0, 0, k * v.s, k * (v.tx + SIDE * v.s), k * (v.ty + pageTop(i) * v.s)); },
+  placeLive(pv, i) { this.ensureLive(); this.liveI = i; this.live.style.display = 'block'; this.setLiveXform(i); },
+  liveDraw(fn) { const c = this.lctx; c.save(); c.beginPath(); c.rect(0, 0, PAGE_W, PAGE_H); c.clip(); fn(c); c.restore(); },
+  clearLive(rect) {
+    const c = this.lctx;
+    if (rect) { c.save(); c.clearRect(rect.x0 - 2, rect.y0 - 2, rect.x1 - rect.x0 + 4, rect.y1 - rect.y0 + 4); c.restore(); }
+    else { c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, this.live.width, this.live.height); c.restore(); }
+  },
+  hideLive() { this.live.style.display = 'none'; this.live.style.opacity = ''; this.live.style.mixBlendMode = ''; },
+
+  /* ----- viewport math ----- */
+  fitScale() { return clamp(this.vw / (WORLD_W - SIDE), .2, 1.45); },
+  minS() { return Math.max(.18, this.fitScale() * .4); },
+  toWorld(cx, cy) { const v = this.view; return { x: (cx - this.rect.left - v.tx) / v.s, y: (cy - this.rect.top - v.ty) / v.s }; },
+  local(cx, cy, i) { const w = this.toWorld(cx, cy); return { x: w.x - SIDE, y: w.y - pageTop(i) }; },
+  pageIndexAt(wx, wy, tol = 0) {
+    const n = this.pvs.length, i = Math.floor((wy - TOP_PAD + GAP / 2) / (PAGE_H + GAP)); if (i < 0 || i >= n) return -1;
+    const y0 = pageTop(i); if (wy < y0 - tol || wy > y0 + PAGE_H + tol || wx < SIDE - tol || wx > SIDE + PAGE_W + tol) return -1; return i;
+  },
+  clampView(v = this.view) {
+    const ww = WORLD_W * v.s, wh = this.worldH * v.s;
+    v.tx = ww <= this.vw ? (this.vw - ww) / 2 : clamp(v.tx, this.vw - ww, 0);
+    v.ty = wh <= this.vh ? 0 : clamp(v.ty, this.vh - wh, 0);
+  },
+  applyView() {
+    const v = this.view; this.world.style.transform = `translate3d(${v.tx}px,${v.ty}px,0) scale(${v.s})`; this.world.style.setProperty('--inv', (1 / v.s).toFixed(4));
+    if (!this._raf) this._raf = requestAnimationFrame(() => { this._raf = 0; this.updateVisible(false); this.curPage(); Sel.place(); UI.onView(); });
+  },
+  panBy(dx, dy) { this.view.tx += dx; this.view.ty += dy; this.clampView(); this.applyView(); },
+  zoomAt(cx, cy, ns) {
+    const v = this.view; ns = clamp(ns, this.minS(), 6); const wx = (cx - v.tx) / v.s, wy = (cy - v.ty) / v.s;
+    v.s = ns; v.tx = cx - wx * ns; v.ty = cy - wy * ns; v.fit = Math.abs(ns - this.fitScale()) < .005; this.clampView(); this.applyView(); this.settleSoon();
+  },
+  zoomBy(f) { this.zoomAt(this.vw / 2, this.vh / 2, this.view.s * f); },
+  fit() { const v = this.view, c = (this.vh * .35 - v.ty) / v.s; v.s = this.fitScale(); v.fit = true; v.ty = -(c * v.s - this.vh * .35); this.clampView(); this.animate(v.tx, v.ty); this.settleSoon(); },
+  animate(tx, ty, ms = 260) {
+    cancelAnimationFrame(this._anim); const v = this.view, t0 = performance.now(), x0 = v.tx, y0 = v.ty;
+    const step = t => { const k = clamp((t - t0) / ms, 0, 1), e = 1 - Math.pow(1 - k, 3); v.tx = x0 + (tx - x0) * e; v.ty = y0 + (ty - y0) * e; this.applyView(); if (k < 1) this._anim = requestAnimationFrame(step); else this.updateVisible(true); };
+    this._anim = requestAnimationFrame(step);
+  },
+  scrollToPage(i, smooth = true) {
+    i = clamp(i, 0, this.pvs.length - 1); const v = this.view;
+    const ty = clamp(-(pageTop(i) - 52) * v.s, Math.min(0, this.vh - this.worldH * v.s), 0);
+    if (smooth) this.animate(v.tx, ty); else { v.ty = ty; this.applyView(); this.updateVisible(true); }
+  },
+  pageVisible(i) { const v = this.view, top = -v.ty / v.s, bot = top + this.vh / v.s, y0 = pageTop(i), y1 = y0 + PAGE_H; return Math.min(y1, bot) - Math.max(y0, top) > Math.min(PAGE_H, this.vh / v.s) * .4; },
+  curPage(silent) {
+    const v = this.view, y = (-v.ty + this.vh * .42) / v.s, i = clamp(Math.floor((y - TOP_PAD + GAP / 2) / (PAGE_H + GAP)), 0, Math.max(0, this.pvs.length - 1));
+    if (i !== this.cur || silent) { const changed = i !== this.cur; this.cur = i; UI.onPageChanged(i, !silent && changed); }
+  },
+
+  /* ----- history ----- */
+  hist() { return this.hists[this.nb.id] || (this.hists[this.nb.id] = { stack: [], idx: -1 }); },
+  pushOp(op) { const H = this.hist(); H.stack.length = H.idx + 1; H.stack.push(op); if (H.stack.length > 250) H.stack.shift(); H.idx = H.stack.length - 1; UI.updateHist(); },
+  canUndo() { return this.nb && this.hist().idx >= 0; }, canRedo() { if (!this.nb) return false; const H = this.hist(); return H.idx < H.stack.length - 1; },
+  undo() { const H = this.hist(); if (H.idx < 0) return; Sel.clear(); const op = H.stack[H.idx--]; op.undo(); this.afterHist(op); },
+  redo() { const H = this.hist(); if (H.idx >= H.stack.length - 1) return; Sel.clear(); const op = H.stack[++H.idx]; op.redo(); this.afterHist(op); },
+  afterHist(op) { UI.updateHist(); if (op.page) { const i = this.nb.pages.indexOf(op.page); if (i >= 0 && !this.pageVisible(i)) this.scrollToPage(i); } },
+  setStrokes(page, arr, rect) { page.strokes = arr; this.invalidate(page, rect); Persist.page(this.nb, page); },
+  commitStrokes(page, after, rect) {            // one undoable change to a page's strokes
+    const before = page.strokes; if (before === after) return;
+    this.setStrokes(page, after, rect);
+    this.pushOp({ page, undo: () => this.setStrokes(page, before), redo: () => this.setStrokes(page, after) });
+  },
+  addStroke(page, st) {
+    const pv = this.pvOf(page), before = page.strokes, after = before.concat([st]);
+    page.strokes = after; page._rev = (page._rev || 0) + 1;
+    if (pv && pv.ctx) { pv.ctx.setTransform(pv.R, 0, 0, pv.R, 0, 0); drawStroke(pv.ctx, st, { dark: isDark(this.paperOf(page)) }); }
+    Persist.page(this.nb, page); UI.thumbDirty && UI.thumbDirty(page);
+    this.pushOp({ page, undo: () => this.setStrokes(page, before), redo: () => this.setStrokes(page, after) });
+  },
+  clearPage(i = this.cur) { const p = this.nb.pages[i]; if (p && p.strokes.length) { Sel.clear(); this.commitStrokes(p, []); } },
+
+  /* ----- page structure ----- */
+  insertPage(i, page) { this.nb.pages.splice(i, 0, page); Persist.page(this.nb, page); Persist.nb(this.nb); this.syncPages(); this.updateVisible(true); UI.onPagesChanged(); },
+  removePage(page) {
+    const i = this.nb.pages.indexOf(page); if (i < 0) return; this.nb.pages.splice(i, 1); this.pages_del(page);
+    Persist.nb(this.nb); this.syncPages(); this.clampView(); this.applyView(); this.updateVisible(true); this.curPage(true); UI.onPagesChanged();
+  },
+  pages_del(page) { Persist.pages.delete(page.id); Persist.delPages.add(page.id); },
+  addPage(at, opts = {}) {
+    const nb = this.nb; Sel.clear(); const i = at == null ? nb.pages.length : clamp(at, 0, nb.pages.length), ref = nb.pages[Math.max(0, i - 1)];
+    const page = newPage(); if (ref && ref.template) page.template = ref.template; if (ref && ref.paperColor) page.paperColor = ref.paperColor; if (opts.template) page.template = opts.template;
+    this.insertPage(i, page); this.pushOp({ page, undo: () => this.removePage(page), redo: () => this.insertPage(i, page) });
+    this.scrollToPage(i); UI.toast('Page ' + (i + 1) + ' added');
+  },
+  duplicatePage(i) {
+    const src = this.nb.pages[i]; if (!src) return; const page = newPage({ strokes: src.strokes.slice(), template: src.template, paperColor: src.paperColor }), at = i + 1;
+    this.insertPage(at, page); this.pushOp({ page, undo: () => this.removePage(page), redo: () => this.insertPage(at, page) }); this.scrollToPage(at);
+  },
+  deletePage(i) {
+    const nb = this.nb, page = nb.pages[i]; if (!page) return; Sel.clear();
+    if (nb.pages.length === 1) { this.clearPage(0); return; }
+    this.removePage(page); this.pushOp({ page, undo: () => this.insertPage(i, page), redo: () => this.removePage(page) });
+    UI.toast('Page deleted', { action: 'Undo', fn: () => this.undo() });
+  },
+  movePage(i, d) {
+    const nb = this.nb, j = i + d; if (j < 0 || j >= nb.pages.length) return;
+    const swap = (a, b) => { const t = nb.pages[a]; nb.pages[a] = nb.pages[b]; nb.pages[b] = t; Persist.nb(nb); this.syncPages(); this.updateVisible(true); UI.onPagesChanged(); };
+    swap(i, j); this.pushOp({ undo: () => swap(j, i), redo: () => swap(i, j) });
+  },
+  setPaper({ template, paperColor, scope }) {
+    const nb = this.nb, pages = scope === 'page' ? [nb.pages[this.cur]] : nb.pages;
+    if (scope !== 'page') { if (template) nb.template = template; if (paperColor) nb.paperColor = paperColor; Persist.nb(nb); }
+    pages.forEach(p => { if (scope === 'page') { if (template) p.template = template; if (paperColor) p.paperColor = paperColor; } else { if (template) delete p.template; if (paperColor) delete p.paperColor; } Persist.page(nb, p); });
+    this.layout(); this.pvs.forEach(pv => pv.canvas && this.paint(pv)); this.pvs.forEach(pv => { pv.page._rev = (pv.page._rev || 0) + 1; });
+    UI.syncInk(); UI.thumbDirty && UI.thumbDirty(null);
+  },
+
+  /* ----- writing mode (auto-hide chrome) ----- */
+  writing(on) {
+    clearTimeout(this.writingT);
+    if (on) { if (S.prefs.autoHide) document.body.classList.add('writing'); UI.closePopover(); }
+    else this.writingT = setTimeout(() => document.body.classList.remove('writing'), 650);
+  },
+  hoverRing(e) {
+    if (S.tool !== 'eraser' || e.pointerType === 'touch') { this.ring.style.display = 'none'; return; }
+    const d = Math.round(S.tools.eraser.width * this.view.s), r = this.ring.style;
+    r.display = 'block'; if (this._rd !== d) { this._rd = d; r.width = r.height = d + 'px'; } r.transform = `translate(${e.clientX - this.rect.left - d / 2}px,${e.clientY - this.rect.top - d / 2}px)`;
+  },
+  hideRing() { this.ring.style.display = 'none'; },
+};
+
+/* ============================================================
+   Selection (lasso)
+   ============================================================ */
+const Sel = {
+  page: null, pi: -1, strokes: new Set(), bb: null, hidden: null, dragging: false,
+  init() { this.box = h('div', { id: 'selbox' }, h('div', { class: 'h' })); Ed.world.insertBefore(this.box, Ed.addcard); this.bar = $('#selbar'); },
+  clear(quiet) { if (!this.page) return; this.page = null; this.strokes = new Set(); this.hidden = null; this.box.style.display = 'none'; this.bar.style.display = 'none'; },
+  set(page, pi, strokes) {
+    this.page = page; this.pi = pi; this.strokes = new Set(strokes); this.hidden = null; this.measureBB(); this.place();
+  },
+  measureBB() {
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (const st of this.strokes) { const b = bboxOf(st); x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1); }
+    this.bb = { x0, y0, x1, y1 };
+  },
+  place() {
+    if (!this.page) return; const b = this.bb, s = this.box.style;
+    s.display = 'block'; s.left = SIDE + b.x0 + 'px'; s.top = pageTop(this.pi) + b.y0 + 'px'; s.width = b.x1 - b.x0 + 'px'; s.height = b.y1 - b.y0 + 'px';
+    if (this.dragging) { this.bar.style.display = 'none'; return; }
+    const v = Ed.view, cx = (SIDE + (b.x0 + b.x1) / 2) * v.s + v.tx, top = (pageTop(this.pi) + b.y0) * v.s + v.ty, bot = (pageTop(this.pi) + b.y1) * v.s + v.ty;
+    const bs = this.bar.style; bs.display = 'flex'; bs.left = clamp(cx, 130, Ed.vw - 130) + 'px';
+    bs.top = (top > 140 ? top - 62 : Math.min(bot + 18, Ed.vh - 120)) + 'px';
+  },
+  hit(w) {                                       // returns 'scale' | 'move' | null for a world point
+    if (!this.page) return null; const b = this.bb, x = w.x - SIDE, y = w.y - pageTop(this.pi), hr = 26 / Ed.view.s;
+    if (Math.abs(x - b.x1) < hr && Math.abs(y - b.y1) < hr) return 'scale';
+    if (x >= b.x0 && x <= b.x1 && y >= b.y0 && y <= b.y1) return 'move'; return null;
+  },
+  xf(st, t) {
+    const a = t.a || 1, f = p => { const q = { x: r1(t.cx + (p.x - t.cx) * a + t.dx), y: r1(t.cy + (p.y - t.cy) * a + t.dy) }; if (p.p !== undefined) q.p = p.p; return q; };
+    return { ...st, id: uid(), points: st.points.map(f), width: st.width * a };
+  },
+  replace(map) {                                 // map: Map(oldStroke → newStroke) ; one undo step
+    const page = this.page, after = page.strokes.map(s => map.has(s) ? map.get(s) : s); Ed.commitStrokes(page, after);
+    this.strokes = new Set(map.values()); this.measureBB(); this.place();
+  },
+  beginDrag() {
+    this.dragging = true; this.hidden = this.strokes; const pv = Ed.pvOf(this.page); Ed.paint(pv);
+    Ed.placeLive(pv, this.pi); Ed.live.style.opacity = 1; Ed.live.style.mixBlendMode = 'normal'; this.preview({ a: 1, dx: 0, dy: 0, cx: 0, cy: 0 });
+  },
+  preview(t) {
+    Ed.clearLive(); Ed.setLiveXform(this.pi); const dark = isDark(Ed.paperOf(this.page));
+    Ed.liveDraw(c => { c.translate(t.cx + t.dx, t.cy + t.dy); c.scale(t.a, t.a); c.translate(-t.cx, -t.cy); for (const st of this.strokes) drawStroke(c, st, { dark }); });
+    const b = this.bb, s = this.box.style, w = (b.x1 - b.x0) * t.a, hh = (b.y1 - b.y0) * t.a, x = t.cx + (b.x0 - t.cx) * t.a + t.dx, y = t.cy + (b.y0 - t.cy) * t.a + t.dy;
+    s.left = SIDE + x + 'px'; s.top = pageTop(this.pi) + y + 'px'; s.width = w + 'px'; s.height = hh + 'px';
+  },
+  endDrag(t, moved) {
+    this.dragging = false; this.hidden = null;
+    if (moved) { const m = new Map(); for (const st of this.strokes) m.set(st, this.xf(st, t)); Ed.hideLive(); Ed.clearLive(); this.replace(m); }
+    else { Ed.hideLive(); Ed.clearLive(); Ed.paint(Ed.pvOf(this.page)); this.place(); }
+  },
+  remove() { if (!this.page) return; const page = this.page, after = page.strokes.filter(s => !this.strokes.has(s)); this.clear(); Ed.commitStrokes(page, after); },
+  duplicate() {
+    if (!this.page) return; const page = this.page, off = 34, copies = [];
+    for (const st of this.strokes) copies.push(this.xf(st, { a: 1, dx: off, dy: off, cx: 0, cy: 0 }));
+    Ed.commitStrokes(page, page.strokes.concat(copies)); this.strokes = new Set(copies); this.measureBB(); this.place();
+  },
+  recolor(color) { const m = new Map(); for (const st of this.strokes) m.set(st, { ...st, id: uid(), color }); this.replace(m); },
+};
+function pointInPoly(x, y, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j]; if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/* ============================================================
+   Actions: Draw / Erase / Lasso / Selection drag
+   ============================================================ */
+const samples = e => { const l = e.getCoalescedEvents ? e.getCoalescedEvents() : null; return l && l.length ? l : [e]; };
+
+class DrawAct {
+  constructor(e, pi, tool) {
+    this.id = e.pointerId; this.type = e.pointerType; this.pi = pi; this.pv = Ed.pvs[pi]; this.page = this.pv.page; this.tool = tool;
+    const cfg = S.tools[tool]; this.st = { id: uid(), tool, color: cfg.color, width: cfg.width, v: 2, points: [] };
+    this.shape = S.shape !== 'none' ? S.shape : null; this.pen = e.pointerType === 'pen'; this.pp = null; this.lastT = e.timeStamp; this.drawn = 1; this.varOn = false;
+    this.dark = isDark(Ed.paperOf(this.page)); this.raw0 = null; this.snap = null; this.holdPos = null; this.dirty = null;
+    Ed.placeLive(this.pv, pi); const hl = tool === 'highlighter';
+    Ed.live.style.opacity = hl ? .38 : 1; Ed.live.style.mixBlendMode = hl && !this.dark ? 'multiply' : 'normal';
+    Ed.clearLive(); Ed.writing(true); this.add(e, true); this.frame();
+  }
+  add(e, first) {
+    const q = Ed.local(e.clientX, e.clientY, this.pi), pts = this.st.points, last = pts[pts.length - 1];
+    if (first) this.raw0 = q;
+    if (this.shape) { this.cur = q; return; }
+    let x = q.x, y = q.y;
+    if (last) { const k = this.pen ? .85 : .6; x = last.x + (q.x - last.x) * k; y = last.y + (q.y - last.y) * k; if (Math.hypot(x - last.x, y - last.y) < .45 && !e._final) return; }
+    let p;
+    if (e._final) p = this.pp == null ? undefined : this.pp;
+    else if (this.tool === 'highlighter') p = undefined;
+    else if (this.pen && e.pressure > 0) p = Math.max(.08, e.pressure);
+    else if (this.tool === 'fountain') { const dt = Math.max(1, e.timeStamp - this.lastT), v = last ? Math.hypot(x - last.x, y - last.y) / dt : 0, target = 1 - clamp(v / 2.6, 0, 1) * .66; p = this.pp == null ? .62 : target; }
+    if (p !== undefined && !e._final) { p = this.pp == null ? p : this.pp * (this.pen ? .5 : .78) + p * (this.pen ? .5 : .22); this.pp = p; }
+    this.lastT = e.timeStamp;
+    const pt = { x, y }; if (p !== undefined) pt.p = Math.round(p * 100) / 100; pts.push(pt);
+    // snap logic (hold still → shape)
+    if (S.prefs.holdSnap && !this.shape) {
+      if (this.snap && dist(q, this.snapAt) > 18) { this.snap = null; this.varOn = false; this.drawn = 1; }
+      if (!this.holdPos || dist(q, this.holdPos) > 3.2) { this.holdPos = q; clearTimeout(this.holdT); this.holdT = setTimeout(() => this.trySnap(), 560); }
+    }
+  }
+  trySnap() {
+    if (this.snap || this.st.points.length < 8) return; const rec = recognizeShape(this.st.points); if (!rec) return;
+    this.snap = rec; this.snapAt = this.st.points[this.st.points.length - 1]; if (navigator.vibrate) navigator.vibrate(8); this.frame();
+  }
+  move(e) {
+    for (const s of samples(e)) this.add(s);
+    if (!this.q) { this.q = true; requestAnimationFrame(() => { this.q = false; if (Ed.act === this || Input.act === this) this.frame(); }); }
+  }
+  stroked() {                                    // full stroke object for preview/commit
+    const st = { ...this.st }; let pts = this.st.points;
+    if (this.shape) { const sp = shapePoints(this.shape, this.raw0, this.cur || this.raw0, st.width); st.points = sp.pts; st.isShape = true; st.isClosed = sp.closed; return st; }
+    const rec = this.snap || null; if (rec) { const sp = shapePoints(rec.type, rec.a, rec.b, st.width); st.points = sp.pts; st.isShape = true; st.isClosed = sp.closed; }
+    return st;
+  }
+  frame() {
+    const pts = this.st.points, opt = { live: true, dark: this.dark };
+    if (this.shape || this.snap) {               // shape preview / snapped shape: redraw the whole (tiny) stroke
+      const st = this.stroked(); Ed.clearLive(); Ed.liveDraw(c => drawStroke(c, st, opt)); this.varOn = false; this.drawn = 1; return;
+    }
+    if (hasVar(this.st)) {                       // variable width: only the new segments are painted
+      if (!this.varOn) { this.varOn = true; this.drawn = 1; Ed.clearLive(); }
+      const n = pts.length, from = this.drawn; Ed.liveDraw(c => drawStroke(c, this.st, opt, from, false)); this.drawn = Math.max(this.drawn, n - 1);
+    } else { Ed.clearLive(); if (pts.length) Ed.liveDraw(c => drawStroke(c, this.st, opt)); }
+  }
+  bounds() { const b = bboxOf({ ...this.st }); return { x0: b.x0 - 6, y0: b.y0 - 6, x1: b.x1 + 6, y1: b.y1 + 6 }; }
+  abort() { clearTimeout(this.holdT); Ed.clearLive(); Ed.hideLive(); }
+  end(e, cancelled) {
+    clearTimeout(this.holdT);
+    if (cancelled) { this.abort(); return; }
+    if (!this.shape) this.add({ clientX: e.clientX, clientY: e.clientY, pressure: 0, timeStamp: e.timeStamp, _final: true });
+    else this.add(e);
+    let st = this.stroked(), pts = st.points;
+    if (!this.shape && !this.snap) {
+      if (S.magic) { const rec = recognizeShape(pts); if (rec) { const sp = shapePoints(rec.type, rec.a, rec.b, st.width); st.points = sp.pts; st.isShape = true; st.isClosed = sp.closed; } else st.points = smoothPoints(pts); }
+    }
+    st.points = st.points.map(p => { const q = { x: r1(p.x), y: r1(p.y) }; if (p.p !== undefined) q.p = p.p; return q; });
+    if (this.pv.canvas || true) Ed.addStroke(this.page, st);
+    Ed.clearLive(); Ed.hideLive();
+  }
+}
+
+class EraseAct {
+  constructor(e) {
+    this.id = e.pointerId; this.before = new Map(); this.dirty = new Map(); this.prev = null; Ed.writing(true); Sel.clear(); this.pi = -1;
+    this.go(e); Ed.hoverRing(e);
+  }
+  r() { return S.tools.eraser.width / 2; }
+  go(e) {
+    const w = Ed.toWorld(e.clientX, e.clientY);
+    if (this.prev) { const d = Math.hypot(w.x - this.prev.x, w.y - this.prev.y), step = Math.max(2, this.r() * .55), k = Math.ceil(d / step); for (let j = 1; j < k; j++) this.at(this.prev.x + (w.x - this.prev.x) * j / k, this.prev.y + (w.y - this.prev.y) * j / k); }
+    this.at(w.x, w.y); this.prev = w;
+  }
+  at(wx, wy) {
+    const i = Ed.pageIndexAt(wx, wy, this.r()); if (i < 0) return; const page = Ed.nb.pages[i], q = { x: wx - SIDE, y: wy - pageTop(i) }, r = this.r(), arr = page.strokes;
+    let out = null, rect = null;
+    const grow = b => { rect = rect ? { x0: Math.min(rect.x0, b.x0), y0: Math.min(rect.y0, b.y0), x1: Math.max(rect.x1, b.x1), y1: Math.max(rect.y1, b.y1) } : { ...b }; };
+    for (let k = 0; k < arr.length; k++) {
+      const st = arr[k]; if (!strokeHit(st, q, r)) { out && out.push(st); continue; }
+      if (!out) out = arr.slice(0, k); grow(bboxOf(st));
+      if (S.tools.eraser.mode === 'precise') out.push(...splitStroke(st, q, r));
+    }
+    if (!out) return; if (!this.before.has(page)) this.before.set(page, arr); page.strokes = out;
+    const d = this.dirty.get(page); this.dirty.set(page, d ? { x0: Math.min(d.x0, rect.x0), y0: Math.min(d.y0, rect.y0), x1: Math.max(d.x1, rect.x1), y1: Math.max(d.y1, rect.y1) } : rect);
+  }
+  move(e) { for (const s of samples(e)) this.go(s); Ed.hoverRing(e); if (!this.q) { this.q = true; requestAnimationFrame(() => { this.q = false; this.flush(); }); } }
+  flush() { this.dirty.forEach((rect, page) => Ed.invalidate(page, rect)); this.dirty.clear(); }
+  end(e, cancelled) {
+    this.flush(); if (e.pointerType === 'touch') Ed.hideRing();
+    const list = [...this.before].map(([page, before]) => ({ page, before, after: page.strokes }));
+    if (!list.length) return; list.forEach(x => Persist.page(Ed.nb, x.page));
+    Ed.pushOp({ page: list[0].page, undo: () => list.forEach(x => Ed.setStrokes(x.page, x.before)), redo: () => list.forEach(x => Ed.setStrokes(x.page, x.after)) });
+  }
+  abort() { }
+}
+
+class LassoAct {
+  constructor(e, pi) {
+    this.id = e.pointerId; this.pi = pi; this.pv = Ed.pvs[pi]; this.pts = []; Ed.placeLive(this.pv, pi); Ed.live.style.opacity = 1; Ed.live.style.mixBlendMode = 'normal'; Ed.clearLive(); Ed.writing(true);
+    this.add(e); this.draw();
+  }
+  add(e) { const q = Ed.local(e.clientX, e.clientY, this.pi), l = this.pts[this.pts.length - 1]; if (!l || dist(l, q) > 1.5) this.pts.push(q); }
+  move(e) { for (const s of samples(e)) this.add(s); this.draw(); }
+  draw() {
+    Ed.clearLive(); const p = this.pts; if (p.length < 2) return; Ed.setLiveXform(this.pi);
+    Ed.liveDraw(c => { c.beginPath(); c.moveTo(p[0].x, p[0].y); for (let i = 1; i < p.length; i++) c.lineTo(p[i].x, p[i].y); c.closePath();
+      c.fillStyle = 'rgba(59,91,219,.10)'; c.fill(); c.lineWidth = 2.4 / Ed.view.s; c.setLineDash([9 / Ed.view.s, 7 / Ed.view.s]); c.strokeStyle = '#3b5bdb'; c.lineCap = 'round'; c.stroke(); });
+  }
+  end(e, cancelled) {
+    Ed.clearLive(); Ed.hideLive(); if (cancelled || this.pts.length < 4) return;
+    const poly = this.pts, page = this.pv.page, hit = [];
+    for (const st of page.strokes) {
+      const b = bboxOf(st), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; let inside = 0; const pp = st.points;
+      for (let i = 0; i < pp.length; i++) if (pointInPoly(pp[i].x, pp[i].y, poly)) inside++;
+      if (inside / pp.length >= .5 || (pointInPoly(cx, cy, poly) && inside > 0)) hit.push(st);
+    }
+    if (hit.length) Sel.set(page, this.pi, hit); else UI.toast('Nothing selected — draw a loop around your ink');
+  }
+  abort() { Ed.clearLive(); Ed.hideLive(); }
+}
+
+class SelDragAct {
+  constructor(e, mode) {
+    this.id = e.pointerId; this.mode = mode; this.pi = Sel.pi; this.s0 = Ed.local(e.clientX, e.clientY, this.pi); this.bb = { ...Sel.bb }; this.t = { a: 1, dx: 0, dy: 0, cx: this.bb.x0, cy: this.bb.y0 }; this.moved = false;
+    Sel.beginDrag(); Ed.writing(true);
+  }
+  move(e) {
+    const q = Ed.local(e.clientX, e.clientY, this.pi), t = this.t;
+    if (this.mode === 'move') { t.dx = q.x - this.s0.x; t.dy = q.y - this.s0.y; t.cx = 0; t.cy = 0; }
+    else { t.a = clamp((q.x - this.bb.x0) / Math.max(10, this.s0.x - this.bb.x0), .15, 8); t.dx = t.dy = 0; t.cx = this.bb.x0; t.cy = this.bb.y0; }
+    this.moved = this.moved || Math.abs(t.dx) + Math.abs(t.dy) > 2 || Math.abs(t.a - 1) > .01; if (!this.q) { this.q = true; requestAnimationFrame(() => { this.q = false; Sel.preview(this.t); }); }
+  }
+  end(e, cancelled) { Sel.endDrag(this.t, this.moved && !cancelled); }
+  abort() { Sel.endDrag(this.t, false); }
+}
+
+/* ============================================================
+   Input — one place for pen, touch and mouse
+   ============================================================ */
+const Input = {
+  touches: new Map(), mode: null, act: null, penActive: false, penId: null, penUpAt: 0, panId: null, pin: null, vel: { x: 0, y: 0 }, lastMove: 0,
+  init() {
+    const vp = Ed.vp;
+    vp.addEventListener('pointerdown', e => this.down(e)); vp.addEventListener('pointermove', e => this.move(e));
+    vp.addEventListener('pointerup', e => this.up(e)); vp.addEventListener('pointercancel', e => this.up(e, true));
+    vp.addEventListener('pointerleave', e => { if (e.pointerType !== 'touch' && !this.act) Ed.hideRing(); });
+    vp.addEventListener('contextmenu', e => e.preventDefault()); vp.addEventListener('wheel', e => this.wheel(e), { passive: false });
+    addEventListener('keydown', e => this.key(e));
+  },
+  fingerDraws() { const m = S.prefs.drawWith; return m === 'any' ? true : m === 'pen' ? false : !S.penSeen; },
+  down(e) {
+    const type = e.pointerType, onAdd = e.target.closest && e.target.closest('.addcard');
+    if ((e.target.closest && e.target.closest('#selbar')) || (onAdd && type !== 'touch')) return;
+    this.tapAdd = null;
+    if (type === 'pen') { if (!S.penSeen) { S.penSeen = true; UI.penDetected(); } this.penActive = true; this.penId = e.pointerId; if (this.touches.size || this.mode) this.dropTouches(); }
+    if (type === 'touch') {
+      if (this.penActive || performance.now() - this.penUpAt < 260) return;
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { Ed.vp.setPointerCapture(e.pointerId); } catch (_) { }
+      if (this.touches.size >= 2) { this.tapAdd = null; this.abortAct(); this.startPinch(); return; }
+      this.stopFling(); UI.closePopover();
+      if (onAdd) { this.tapAdd = { x: e.clientX, y: e.clientY, t: performance.now() }; this.startPan(e); return; }   // swipe scrolls, tap adds a page
+      if (!this.fingerDraws()) { this.startPan(e); return; }
+    }
+    if (type === 'mouse' && (e.button === 1 || e.button === 2)) { this.startPan(e); e.preventDefault(); return; }
+    if (type === 'mouse' && e.button !== 0) return;
+    try { Ed.vp.setPointerCapture(e.pointerId); } catch (_) { }
+    if (this.mode) return; this.begin(e);
+  },
+  begin(e) {
+    let tool = S.tool; if (e.pointerType === 'pen' && ((e.buttons & 32) || (e.buttons & 2))) tool = 'eraser';
+    const w = Ed.toWorld(e.clientX, e.clientY);
+    if (tool === 'lasso') {
+      const hit = Sel.hit(w); if (hit) { this.act = new SelDragAct(e, hit); return; }
+      Sel.clear(); const pi = Ed.pageIndexAt(w.x, w.y, 14); if (pi < 0) return; this.act = new LassoAct(e, pi); return;
+    }
+    if (tool === 'eraser') { this.act = new EraseAct(e); return; }
+    const pi = Ed.pageIndexAt(w.x, w.y, 10); if (pi < 0) { if (e.pointerType === 'touch') this.startPan(e); return; }
+    Sel.clear(); this.act = new DrawAct(e, pi, tool);
+  },
+  abortAct() { if (this.act) { try { this.act.abort(); } catch (_) { } this.act = null; Ed.writing(false); } },
+  dropTouches() { this.abortAct(); this.touches.clear(); this.mode = null; this.pin = null; this.stopFling(); },
+  move(e) {
+    const id = e.pointerId, t = this.touches.get(id); if (t) { t.x = e.clientX; t.y = e.clientY; }
+    if (e.pointerType === 'touch' && !t && !(this.act && this.act.id === id)) return;
+    if (this.mode === 'pinch') { this.updatePinch(); return; }
+    if (this.mode === 'pan' && id === this.panId) { this.updatePan(e); return; }
+    if (this.act && id === this.act.id) { this.act.move(e); if (this.act instanceof DrawAct === false && S.tool === 'eraser') Ed.hoverRing(e); return; }
+    if (e.pointerType === 'pen' && !S.penSeen) { S.penSeen = true; UI.penDetected(); }
+    if (e.pointerType !== 'touch') Ed.hoverRing(e);
+  },
+  up(e, cancelled) {
+    const id = e.pointerId;
+    if (e.pointerType === 'pen' && id === this.penId) { this.penActive = false; this.penUpAt = performance.now(); }
+    const wasTouch = this.touches.delete(id);
+    if (this.mode === 'pinch') {
+      if (this.touches.size < 2) { this.mode = null; this.pin = null; Ed.settleSoon(); if (this.touches.size === 1) { const [rid, t] = [...this.touches][0]; this.panId = rid; this.mode = 'pan'; this.pl = { x: t.x, y: t.y }; this.vel = { x: 0, y: 0 }; this.lastT = performance.now(); } }
+      return;
+    }
+    if (this.mode === 'pan' && id === this.panId) {
+      const ta = this.tapAdd; this.tapAdd = null; this.endPan();
+      if (ta && !cancelled && Math.hypot(e.clientX - ta.x, e.clientY - ta.y) < 10 && performance.now() - ta.t < 600) Ed.addPage();
+      return;
+    }
+    if (this.act && id === this.act.id) { const a = this.act; this.act = null; try { a.end(e, cancelled); } catch (err) { console.error(err); } Ed.writing(false); }
+  },
+  /* pan / pinch */
+  startPan(e) { this.mode = 'pan'; this.panId = e.pointerId; this.pl = { x: e.clientX, y: e.clientY }; this.vel = { x: 0, y: 0 }; this.lastT = e.timeStamp; this.stopFling(); try { Ed.vp.setPointerCapture(e.pointerId); } catch (_) { } },
+  updatePan(e) {
+    const dx = e.clientX - this.pl.x, dy = e.clientY - this.pl.y, dt = Math.max(1, e.timeStamp - this.lastT);
+    this.vel.x = this.vel.x * .7 + (dx / dt) * .3; this.vel.y = this.vel.y * .7 + (dy / dt) * .3; this.pl = { x: e.clientX, y: e.clientY }; this.lastT = e.timeStamp; this.lastMove = performance.now();
+    Ed.panBy(dx, dy);
+  },
+  endPan() { this.mode = null; if (performance.now() - this.lastMove < 70 && Math.hypot(this.vel.x, this.vel.y) > .12) this.fling(); else Ed.settleSoon(); },
+  fling() {
+    let vx = this.vel.x, vy = this.vel.y, last = performance.now();
+    const step = t => { const dt = Math.min(34, t - last); last = t; Ed.panBy(vx * dt, vy * dt); const k = Math.pow(.94, dt / 16); vx *= k; vy *= k; if (Math.hypot(vx, vy) > .03) this.flingId = requestAnimationFrame(step); else Ed.settleSoon(); };
+    this.flingId = requestAnimationFrame(step);
+  },
+  stopFling() { cancelAnimationFrame(this.flingId); cancelAnimationFrame(Ed._anim); },
+  startPinch() {
+    this.mode = 'pinch'; this.stopFling(); const [a, b] = [...this.touches.values()], v = Ed.view, r = Ed.rect, cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+    this.pin = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: v.s, wx: (cx - r.left - v.tx) / v.s, wy: (cy - r.top - v.ty) / v.s };
+  },
+  updatePinch() {
+    const [a, b] = [...this.touches.values()]; if (!b || !this.pin) return; const v = Ed.view, r = Ed.rect, p = this.pin;
+    const d = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2 - r.left, cy = (a.y + b.y) / 2 - r.top, ns = clamp(p.s0 * d / p.d0, Ed.minS(), 6);
+    v.s = ns; v.tx = cx - p.wx * ns; v.ty = cy - p.wy * ns; v.fit = Math.abs(ns - Ed.fitScale()) < .005; Ed.clampView(); Ed.applyView(); Ed.settleSoon();
+  },
+  wheel(e) {
+    e.preventDefault(); if (this.act) return; const r = Ed.rect;
+    if (e.ctrlKey || e.metaKey) Ed.zoomAt(e.clientX - r.left, e.clientY - r.top, Ed.view.s * Math.exp(-e.deltaY * .01));
+    else { const k = e.deltaMode === 1 ? 16 : 1; Ed.panBy(-e.deltaX * k, -e.deltaY * k); Ed.settleSoon(); }
+  },
+  key(e) {
+    if (/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || '')) || !Ed.nb || !$('#library').hidden) return;
+    const m = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+    if (m && k === 'z') { e.preventDefault(); e.shiftKey ? Ed.redo() : Ed.undo(); }
+    else if (m && k === 'y') { e.preventDefault(); Ed.redo(); }
+    else if ((k === 'delete' || k === 'backspace') && Sel.page) { e.preventDefault(); Sel.remove(); }
+    else if (k === 'escape') { Sel.clear(); UI.closePopover(); }
+    else if (!m && 'pfhel'.includes(k) && k.length === 1) { const t = { p: 'pen', f: 'fountain', h: 'highlighter', e: 'eraser', l: 'lasso' }[k]; UI.setTool(t); }
+  },
+};
+
+'use strict';
+/* ============================================================
+   UI — top bar, tool dock, popovers, sheets, dialogs, toasts
+   ============================================================ */
+const INK_COLORS = ['#111827', '#6b7280', '#2563eb', '#0ea5e9', '#16a34a', '#84cc16', '#f59e0b', '#ea580c', '#dc2626', '#db2777', '#7c3aed', '#ffffff'];
+const HL_COLORS = ['#ffe066', '#ffb3d1', '#86efac', '#93c5fd', '#fdba74', '#d8b4fe', '#fca5a5', '#67e8f9', '#fde68a', '#bef264', '#c4b5fd', '#e7e5e4'];
+const COVER_COLORS = ['#3b5bdb', '#0ea5e9', '#16a34a', '#f59e0b', '#ea580c', '#dc2626', '#db2777', '#7c3aed'];
+const TOOL_NAMES = { pen: 'Ballpoint', fountain: 'Fountain pen', highlighter: 'Highlighter', eraser: 'Eraser', lasso: 'Select' };
+const TOOL_RANGE = { pen: [1, 12], fountain: [1, 14], highlighter: [6, 44], eraser: [10, 90] };
+const SHAPES = [['none', 'Freehand', 's_free'], ['line', 'Line', 's_line'], ['rect', 'Rectangle', 's_rect'], ['ellipse', 'Ellipse', 's_ellipse'], ['triangle', 'Triangle', 's_triangle'], ['arrow', 'Arrow', 's_arrow']];
+
+const UI = {
+  lastInk: 'pen', popAnchor: null, popClosedAt: 0,
+
+  init() {
+    $('#topbar').innerHTML = `
+      <button class="ibtn" data-act="library" aria-label="Library">${ic('library')}</button>
+      <div id="tabs"></div><span class="savedot" id="savedot" title="Saved"></span>
+      <button class="ibtn" id="bUndo" data-act="undo" aria-label="Undo" disabled>${ic('undo')}</button>
+      <button class="ibtn" id="bRedo" data-act="redo" aria-label="Redo" disabled>${ic('redo')}</button>
+      <button class="pagechip" data-act="pagemenu" aria-label="Pages"><span id="pgcur">1</span><small>/ <span id="pgtot">1</span></small></button>
+      <button class="ibtn" data-act="menu" aria-label="More">${ic('more')}</button>`;
+    $('#dock').innerHTML = `
+      <div class="grip" id="grip" aria-label="Move toolbar"><i></i></div>
+      <div class="tools">${['pen', 'fountain', 'highlighter', 'eraser', 'lasso'].map(t => `<button class="tool" data-tool="${t}" aria-label="${TOOL_NAMES[t]}">${ic(t)}</button>`).join('')}</div>
+      <span class="sep"></span>
+      <button class="dbtn" data-act="shapes" aria-label="Shapes">${ic('shapes')}<i class="badge" hidden></i></button>
+      <button class="dbtn" data-act="magic" aria-label="Auto-shape">${ic('sparkle')}</button>
+      <span class="sep"></span>
+      <button class="colorchip" data-act="color" aria-label="Colour"><i></i></button>
+      <button class="dbtn" data-act="collapse" aria-label="Hide toolbar">${ic('chevD')}</button>
+      <button class="dbtn expander" data-act="expand" aria-label="Show toolbar" id="expander"></button>`;
+    $('#selbar').innerHTML = `
+      <button class="ibtn" data-act="selcolor" aria-label="Colour">${ic('palette')}</button>
+      <button class="ibtn" data-act="seldup" aria-label="Duplicate">${ic('copy')}</button>
+      <button class="ibtn danger" data-act="seldel" aria-label="Delete">${ic('trash')}</button>`;
+    document.addEventListener('click', e => {
+      const t = e.target.closest('[data-tool]'); if (t && t.closest('#dock')) { this.toolTap(t.dataset.tool, t); return; }
+      const b = e.target.closest('[data-act]'); if (b) this.act(b.dataset.act, b, e);
+    });
+    document.addEventListener('pointerdown', e => {
+      const p = $('#popover'); if (p.hidden || p.contains(e.target)) return;
+      if (this.popAnchor && this.popAnchor.contains(e.target)) { this._anchorHit = true; } else this._anchorHit = false;
+      this.closePopover();
+    }, true);
+    this.initGrip(); this.applyTheme(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.applyTheme());
+    this.syncInk(); this.renderTabs(); this.placeDock(); this.updateHist();
+    $('#modal').addEventListener('pointerdown', e => { if (e.target.id === 'modal') Modal.close(); });
+  },
+
+  /* ----- persistence of UI prefs ----- */
+  saveUiState() {
+    try { localStorage.setItem('nt4_ui', JSON.stringify({ tabs: S.tabs, activeId: S.activeId, views: S.views, tools: S.tools, tool: S.tool, shape: S.shape, magic: S.magic, prefs: S.prefs, dock: S.dock, recent: S.recent, penSeen: S.penSeen })); } catch (e) { }
+  },
+  loadUiState() {
+    try {
+      const o = JSON.parse(localStorage.getItem('nt4_ui') || 'null'); if (!o) return;
+      Object.assign(S.prefs, o.prefs || {}); if (o.tools) for (const k in o.tools) Object.assign(S.tools[k] || (S.tools[k] = {}), o.tools[k]);
+      S.tool = o.tool || 'pen'; S.shape = o.shape || 'none'; S.magic = !!o.magic; S.dock = Object.assign(S.dock, o.dock || {}); S.recent = o.recent || []; S.penSeen = !!o.penSeen;
+      S.tabs = o.tabs || []; S.activeId = o.activeId || null; S.views = o.views || {};
+    } catch (e) { }
+  },
+  applyTheme() {
+    const t = S.prefs.theme, dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    const m = $('meta[name=theme-color]'); if (m) m.content = dark ? '#1a1d25' : '#ffffff';
+  },
+
+  /* ----- small feedback widgets ----- */
+  saving(on, err) { const d = $('#savedot'); if (!d) return; d.className = 'savedot' + (on ? ' busy' : ' show'); if (err) { d.style.background = 'var(--danger)'; } else d.style.background = ''; if (!on && !err) { clearTimeout(this._sd); this._sd = setTimeout(() => d.classList.remove('show'), 1400); } },
+  toast(msg, o = {}) {
+    const box = $('#toasts'), t = h('div', { class: 'toast' }, h('span', null, msg));
+    if (o.action) t.append(h('button', { onclick: () => { o.fn(); kill(); } }, o.action));
+    const kill = () => { t.classList.add('out'); setTimeout(() => t.remove(), 260); };
+    while (box.children.length > 2) box.firstChild.remove(); box.append(t); setTimeout(kill, o.ms || 3200);
+  },
+  penDetected() { if (S.prefs.drawWith === 'auto') this.toast('Stylus detected — fingers now scroll & zoom'); this.saveUiState(); },
+  writing() { },
+  onResize() { this.placeDock(); },
+  onView() { },
+  onPagesChanged() {
+    const n = Ed.nb ? Ed.nb.pages.length : 1; $('#pgtot').textContent = n; $('#pgcur').textContent = Math.min(Ed.cur + 1, n);
+    if (this.overviewRefresh) this.overviewRefresh();
+  },
+  onPageChanged(i, show) {
+    $('#pgcur').textContent = i + 1; $('#pgtot').textContent = Ed.nb.pages.length;
+    if (show) { const t = $('#pagetoast'); t.textContent = `Page ${i + 1} of ${Ed.nb.pages.length}`; t.classList.add('show'); clearTimeout(this._pt); this._pt = setTimeout(() => t.classList.remove('show'), 900); }
+  },
+  updateHist() { const u = $('#bUndo'), r = $('#bRedo'); if (u) { u.disabled = !Ed.canUndo(); r.disabled = !Ed.canRedo(); } },
+
+  /* ----- tabs ----- */
+  renderTabs() {
+    const box = $('#tabs'); box.innerHTML = '';
+    S.tabs.forEach(id => {
+      const nb = getNb(id); if (!nb) return; const on = id === S.activeId;
+      const el = h('div', { class: 'tab' + (on ? ' active' : ''), role: 'tab' },
+        h('i', { class: 'dot', style: 'background:' + nb.color }), h('span', { class: 't' }, nb.title),
+        h('button', { class: 'x', 'aria-label': 'Close tab', onclick: e => { e.stopPropagation(); App.closeTab(id); }, html: ic('close') }));
+      el.addEventListener('click', () => { if (on) App.rename(id); else App.open(id); });
+      box.append(el); if (on) setTimeout(() => el.scrollIntoView({ inline: 'nearest', block: 'nearest' }), 0);
+    });
+    box.append(h('button', { class: 'ibtn newtab', 'aria-label': 'New notebook', onclick: () => Dialogs.newNotebook(), html: ic('plus') }));
+  },
+
+  /* ----- tools & dock ----- */
+  toolTap(t, btn) {
+    if (S.tool === t) { this.toggle(btn, () => this.toolPanel(t)); return; }
+    this.setTool(t);
+  },
+  setTool(t) {
+    S.tool = t; if (S.tools[t] && t !== 'eraser') this.lastInk = t; if (t !== 'lasso') Sel.clear(); if (t !== 'eraser') Ed.hideRing();
+    if (t === 'eraser' || t === 'lasso') { /* shapes irrelevant */ } else if (S.shape !== 'none') { }
+    this.syncInk(); this.saveUiState();
+  },
+  inkTool() { return S.tool === 'eraser' || S.tool === 'lasso' ? this.lastInk : S.tool; },
+  syncInk() {
+    $$('#dock .tool').forEach(b => { const t = b.dataset.tool; b.classList.toggle('active', S.tool === t); b.style.setProperty('--ink', S.tools[t] && S.tools[t].color ? S.tools[t].color : 'currentColor'); });
+    const it = this.inkTool(), col = S.tools[it].color; $('#dock .colorchip i').style.background = col; $('#dock').style.setProperty('--ink', col);
+    $('#dock [data-act=magic]').classList.toggle('on', S.magic);
+    const sb = $('#dock [data-act=shapes]'); sb.classList.toggle('on', S.shape !== 'none'); $('.badge', sb).hidden = S.shape === 'none';
+    $('#expander').innerHTML = ic(S.tool).replace('class="ic ', 'style="--ink:' + col + '" class="ic ');
+    $('#dock').classList.toggle('collapsed', !!S.dock.collapsed);
+    const cur = S.tool === 'eraser' || S.tool === 'lasso' ? '' : ''; Ed.vp && (Ed.vp.style.cursor = S.tool === 'eraser' ? 'none' : 'crosshair');
+  },
+  act(a, el) {
+    switch (a) {
+      case 'library': Lib.open(); break;
+      case 'undo': Ed.undo(); break; case 'redo': Ed.redo(); break;
+      case 'pagemenu': this.toggle(el, () => this.pageMenu(), { menu: true }); break;
+      case 'menu': this.toggle(el, () => this.mainMenu(), { menu: true }); break;
+      case 'shapes': this.toggle(el, () => this.shapePanel()); break;
+      case 'color': this.toggle(el, () => this.toolPanel(this.inkTool())); break;
+      case 'magic': S.magic = !S.magic; this.syncInk(); this.saveUiState(); this.toast(S.magic ? 'Auto-shape on — finished lines & shapes snap straight' : 'Auto-shape off'); break;
+      case 'collapse': S.dock.collapsed = true; this.closePopover(); this.syncInk(); this.saveUiState(); break;
+      case 'expand': S.dock.collapsed = false; this.syncInk(); this.placeDock(); this.saveUiState(); break;
+      case 'seldel': Sel.remove(); break; case 'seldup': Sel.duplicate(); break;
+      case 'selcolor': this.toggle(el, () => this.colorOnly(c => Sel.recolor(c)), { below: true }); break;
+    }
+  },
+
+  /* ----- popover plumbing ----- */
+  toggle(anchor, build, o = {}) {
+    if (this._anchorHit && this.popAnchor === anchor && performance.now() - this.popClosedAt < 400) { this._anchorHit = false; return; }
+    this.openPopover(anchor, build(), o);
+  },
+  openPopover(anchor, node, o = {}) {
+    const p = $('#popover'); p.innerHTML = ''; p.className = o.menu ? 'menu' : ''; p.append(node); p.hidden = false; p.style.visibility = 'hidden'; this.popAnchor = anchor;
+    const a = anchor.getBoundingClientRect(), pw = p.offsetWidth, ph = p.offsetHeight, vw = innerWidth, vh = innerHeight;
+    const below = o.below || a.top < vh * .45 && !o.above; let top = below ? a.bottom + 10 : a.top - ph - 12;
+    top = clamp(top, 8, vh - ph - 8); let left = clamp(a.left + a.width / 2 - pw / 2, 8, vw - pw - 8);
+    p.style.left = left + 'px'; p.style.top = top + 'px'; p.style.setProperty('--ox', (a.left + a.width / 2 - left) + 'px'); p.style.setProperty('--oy', below ? '0%' : '100%'); p.style.setProperty('--dy', below ? '-6px' : '6px'); p.style.visibility = '';
+  },
+  closePopover() { const p = $('#popover'); if (!p.hidden) { p.hidden = true; this.popClosedAt = performance.now(); } },
+
+  /* ----- popover contents ----- */
+  swatches(colors, cur, pick) {
+    const wrap = h('div', { class: 'swatches' });
+    const mk = c => h('button', { class: 'sw' + (c.toLowerCase() === cur.toLowerCase() ? ' sel' : ''), style: '--c:' + c, 'aria-label': c, onclick: () => pick(c) });
+    colors.forEach(c => wrap.append(mk(c)));
+    (S.recent || []).slice(0, 6).forEach(c => wrap.append(mk(c)));
+    const inp = h('input', { type: 'color', value: cur.length === 7 ? cur : '#000000', 'aria-label': 'Custom colour' });
+    inp.addEventListener('change', () => { const c = inp.value; S.recent = [c, ...S.recent.filter(x => x !== c)].slice(0, 6); pick(c); });
+    wrap.append(h('span', { class: 'sw custom', html: ic('plus') }, inp)); return wrap;
+  },
+  colorOnly(pick) { const w = h('div'); w.append(h('div', { class: 'plabel' }, 'Colour'), this.swatches(INK_COLORS.concat(), '#', c => { pick(c); this.closePopover(); })); return w; },
+  toolPanel(tool) {
+    const cfg = S.tools[tool], root = h('div'), range = TOOL_RANGE[tool];
+    root.append(h('div', { class: 'plabel' }, TOOL_NAMES[tool]));
+    if (tool === 'eraser') {
+      const seg = h('div', { class: 'seg', style: 'margin-bottom:14px' });
+      [['stroke', 'Whole stroke'], ['precise', 'Precise']].forEach(([k, l]) => seg.append(h('button', { class: cfg.mode === k ? 'on' : '', onclick: e => { cfg.mode = k; $$('button', seg).forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); UI.saveUiState(); } }, l)));
+      root.append(seg);
+    }
+    const pv = h('div', { class: 'preview' }, h('canvas', { width: 600, height: 108 })), cv = pv.firstChild;
+    const paint = () => {
+      const c = cv.getContext('2d'); c.clearRect(0, 0, 600, 108); c.save(); c.scale(2, 2);
+      const dark = document.documentElement.dataset.theme === 'dark';
+      if (tool === 'eraser') { c.strokeStyle = dark ? '#fff' : '#111'; c.lineWidth = 1.5; c.beginPath(); c.arc(150, 27, cfg.width / 2, 0, 6.3); c.stroke(); }
+      else { const pts = []; for (let i = 0; i <= 40; i++) { const x = 24 + i * 6.3, t = i / 40; const p = { x, y: 27 + Math.sin(t * 7) * 11 * (1 - t * .3) }; if (tool === 'fountain') p.p = .35 + .6 * Math.sin(t * Math.PI); pts.push(p); }
+        drawStroke(c, { tool, color: cfg.color, width: cfg.width, v: 2, points: pts }, { dark }); }
+      c.restore();
+    };
+    paint(); root.append(pv);
+    const out = h('output', null, cfg.width), inp = h('input', { type: 'range', min: range[0], max: range[1], step: 1, value: cfg.width, 'aria-label': 'Size' });
+    const upd = () => { inp.style.setProperty('--p', ((inp.value - range[0]) / (range[1] - range[0]) * 100) + '%'); }; upd();
+    inp.addEventListener('input', () => { cfg.width = +inp.value; out.textContent = inp.value; upd(); paint(); if (tool === 'eraser') Ed.hideRing(); });
+    inp.addEventListener('change', () => this.saveUiState());
+    root.append(h('div', { class: 'sliderrow' }, h('span', { html: ic(tool === 'eraser' ? 'eraser' : 'pen'), style: 'width:22px;color:var(--text3)' }), inp, out));
+    if (tool !== 'eraser') {
+      root.append(h('div', { class: 'plabel' }, 'Colour'));
+      root.append(this.swatches(tool === 'highlighter' ? HL_COLORS : INK_COLORS, cfg.color, c => { cfg.color = c; this.syncInk(); this.saveUiState(); this.openPopover(this.popAnchor, this.toolPanel(tool)); }));
+    } else root.append(h('p', { class: 'hint' }, 'Tip: the pen’s side button (or its eraser end) erases without switching tools.'));
+    return root;
+  },
+  shapePanel() {
+    const root = h('div'), g = h('div', { class: 'shapegrid' }); root.append(h('div', { class: 'plabel' }, 'Draw shapes'), g);
+    SHAPES.forEach(([k, l, i]) => g.append(h('button', { class: S.shape === k ? 'on' : '', html: ic(i) + l, onclick: () => { S.shape = k; if (k !== 'none' && (S.tool === 'eraser' || S.tool === 'lasso')) this.setTool(this.lastInk); this.syncInk(); this.saveUiState(); this.closePopover(); } })));
+    root.append(h('p', { class: 'hint' }, 'Tip: with Freehand, draw a line or circle and hold still for a moment — it snaps to a perfect shape.')); return root;
+  },
+  menuItem(icon, label, fn, o = {}) { return h('button', { class: 'mi' + (o.danger ? ' danger' : ''), onclick: () => { UI.closePopover(); fn(); }, html: ic(icon) + `<span>${label}</span>` + (o.sub ? `<span class="sub">${o.sub}</span>` : '') }); },
+  pageMenu() {
+    const n = Ed.nb.pages.length, cur = Ed.cur, root = h('div'), z = Math.round(Ed.view.s / Ed.fitScale() * 100);
+    root.append(this.menuItem('pages', 'Page overview', () => Dialogs.overview()),
+      this.menuItem('chevU', 'Previous page', () => Ed.scrollToPage(cur - 1), { sub: cur === 0 ? '' : String(cur) }),
+      this.menuItem('chevD', 'Next page', () => Ed.scrollToPage(cur + 1), { sub: cur >= n - 1 ? '' : String(cur + 2) }),
+      this.menuItem('plus', 'Insert page after this', () => Ed.addPage(cur + 1)), h('div', { class: 'mdiv' }));
+    const zr = h('div', { class: 'prow', style: 'padding:4px 6px 6px' }, h('button', { class: 'ibtn', 'aria-label': 'Zoom out', onclick: () => Ed.zoomBy(1 / 1.25), html: ic('zoomOut') }),
+      h('span', { style: 'flex:1;text-align:center;font-weight:700' }, z + '%'), h('button', { class: 'ibtn', 'aria-label': 'Zoom in', onclick: () => Ed.zoomBy(1.25), html: ic('zoomIn') }),
+      h('button', { class: 'ibtn', 'aria-label': 'Fit width', onclick: () => { Ed.fit(); UI.closePopover(); }, html: ic('fit') }));
+    root.append(zr); return root;
+  },
+  mainMenu() {
+    const root = h('div'), fs = !!document.fullscreenElement;
+    root.append(this.menuItem('paper', 'Paper & template', () => Dialogs.paper()), this.menuItem('pages', 'Page overview', () => Dialogs.overview()),
+      this.menuItem('download', 'Export…', () => Dialogs.exportSheet()), h('div', { class: 'mdiv' }),
+      this.menuItem(fs ? 'exitfull' : 'full', fs ? 'Exit full screen' : 'Full screen', () => App.fullscreen()),
+      this.menuItem('hide', 'Hide toolbar', () => { S.dock.collapsed = true; UI.syncInk(); UI.saveUiState(); }),
+      this.menuItem('gear', 'Settings', () => Dialogs.settings()), this.menuItem('help', 'Gestures & tips', () => Dialogs.tips()), h('div', { class: 'mdiv' }),
+      this.menuItem('trash', 'Clear this page', () => Dialogs.confirm({ title: 'Clear this page?', msg: 'All ink on the current page will be removed. You can undo this.', ok: 'Clear page', danger: true }).then(y => y && Ed.clearPage()), { danger: true }));
+    return root;
+  },
+
+  /* ----- dock position ----- */
+  initGrip() {
+    const g = $('#grip'), d = $('#dock'); let sx, sy, ox, oy, on = false;
+    g.addEventListener('pointerdown', e => { const r = d.getBoundingClientRect(); sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top; on = true; g.setPointerCapture(e.pointerId); d.classList.add('free'); d.style.left = ox + 'px'; d.style.top = oy + 'px'; });
+    g.addEventListener('pointermove', e => { if (!on) return; const w = d.offsetWidth, hh = d.offsetHeight; d.style.left = clamp(ox + e.clientX - sx, 4, innerWidth - w - 4) + 'px'; d.style.top = clamp(oy + e.clientY - sy, 60, innerHeight - hh - 4) + 'px'; });
+    const end = () => { if (!on) return; on = false; S.dock.x = parseFloat(d.style.left); S.dock.y = parseFloat(d.style.top); this.saveUiState(); };
+    g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+    g.addEventListener('dblclick', () => { S.dock.x = S.dock.y = null; this.placeDock(); this.saveUiState(); });
+  },
+  placeDock() {
+    const d = $('#dock'); if (S.dock.x == null) { d.classList.remove('free'); d.style.left = d.style.top = ''; return; }
+    d.classList.add('free'); d.style.left = clamp(S.dock.x, 4, Math.max(4, innerWidth - d.offsetWidth - 4)) + 'px'; d.style.top = clamp(S.dock.y, 60, Math.max(60, innerHeight - d.offsetHeight - 4)) + 'px';
+  },
+
+  /* ----- thumbnails (cached by page revision) ----- */
+  thumbs: new Map(), tq: [], tbusy: false,
+  thumbDirty(page) { if (!page) this.thumbs.clear(); else this.thumbs.delete(page.id); },
+  thumb(nb, page, w = 260) {
+    const hit = this.thumbs.get(page.id); if (hit && hit.w >= w) return hit.url;
+    const c = document.createElement('canvas'), k = w / PAGE_W; c.width = w; c.height = Math.round(PAGE_H * k); const x = c.getContext('2d'); x.scale(k, k); renderPage(x, page, nb);
+    const url = c.toDataURL('image/jpeg', .8); this.thumbs.set(page.id, { url, w }); return url;
+  },
+  thumbAsync(nb, page, img, w) {
+    const hit = this.thumbs.get(page.id); if (hit && hit.w >= w) { img.src = hit.url; return; }
+    this.tq.push({ nb, page, img, w }); if (!this.tbusy) { this.tbusy = true; setTimeout(() => this.pump(), 0); }
+  },
+  pump() {
+    const j = this.tq.shift(); if (!j) { this.tbusy = false; return; }
+    try { if (j.img.isConnected) j.img.src = this.thumb(j.nb, j.page, j.w); } catch (e) { }
+    setTimeout(() => this.pump(), 8);
+  },
+};
+
+/* ============================================================
+   Modal + dialogs
+   ============================================================ */
+const Modal = {
+  open({ title, body, footer, cls = '', onClose }) {
+    const m = $('#modal'); m.innerHTML = ''; this.onClose = onClose; UI.closePopover();
+    const sh = h('div', { class: 'sheet ' + cls, role: 'dialog' },
+      h('div', { class: 'sheet-h' }, h('h2', null, title), h('button', { class: 'ibtn', 'aria-label': 'Close', onclick: () => Modal.close(), html: ic('close') })),
+      h('div', { class: 'sheet-b' }, body)); if (footer) sh.append(h('div', { class: 'sheet-f' }, footer));
+    m.append(sh); m.hidden = false; return sh;
+  },
+  close() { const m = $('#modal'); if (m.hidden) return; m.hidden = true; m.innerHTML = ''; UI.overviewRefresh = null; const f = this.onClose; this.onClose = null; f && f(); },
+};
+function tileGrid(sel, pick) {
+  const g = h('div', { class: 'tiles' });
+  TEMPLATES.forEach(t => {
+    const c = h('canvas', { width: 170, height: 220 }), x = c.getContext('2d'); x.scale(.2, .2); x.fillStyle = '#fff'; x.fillRect(0, 0, PAGE_W, PAGE_H); drawTemplate(x, t.id, '#ffffff');
+    const el = h('button', { class: 'tile' + (t.id === sel ? ' sel' : ''), onclick: () => { $$('.tile', g).forEach(e => e.classList.remove('sel')); el.classList.add('sel'); pick(t.id); } }, c, h('span', null, t.name)); g.append(el);
+  });
+  return g;
+}
+function paperRow(sel, pick) {
+  const r = h('div', { class: 'papers' });
+  PAPERS.forEach(p => { const b = h('button', { class: 'sw' + (p === sel ? ' sel' : ''), style: '--c:' + p, 'aria-label': PAPER_NAMES[p], title: PAPER_NAMES[p], onclick: () => { $$('.sw', r).forEach(e => e.classList.remove('sel')); b.classList.add('sel'); pick(p); } }); r.append(b); });
+  return r;
+}
+const Dialogs = {
+  ask({ title, label, value = '', ok = 'Save', placeholder = '' }) {
+    return new Promise(res => {
+      let done = false; const f = v => { if (!done) { done = true; Modal.close(); res(v); } };
+      const inp = h('input', { class: 'field', value, placeholder, maxlength: 80 });
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') f(inp.value.trim() || null); });
+      Modal.open({ title, cls: 'dialog', body: [label ? h('div', { class: 'fl' }, label) : null, inp], footer: [h('button', { class: 'btn', onclick: () => f(null) }, 'Cancel'), h('button', { class: 'btn primary', onclick: () => f(inp.value.trim() || null) }, ok)], onClose: () => f(null) });
+      setTimeout(() => { inp.focus(); inp.select(); }, 60);
+    });
+  },
+  confirm({ title, msg, ok = 'OK', danger }) {
+    return new Promise(res => {
+      let done = false; const f = v => { if (!done) { done = true; Modal.close(); res(v); } };
+      Modal.open({ title, cls: 'dialog', body: h('p', { style: 'color:var(--text2);line-height:1.5' }, msg), footer: [h('button', { class: 'btn', onclick: () => f(false) }, 'Cancel'), h('button', { class: 'btn ' + (danger ? 'danger' : 'primary'), onclick: () => f(true) }, ok)], onClose: () => f(false) });
+    });
+  },
+  newNotebook() {
+    let color = COVER_COLORS[S.notebooks.length % COVER_COLORS.length], template = 'lined', paper = '#ffffff';
+    const inp = h('input', { class: 'field', value: 'Untitled notebook', maxlength: 80 });
+    const cols = h('div', { class: 'colorrow' }); COVER_COLORS.forEach(c => { const b = h('button', { class: 'sw' + (c === color ? ' sel' : ''), style: '--c:' + c, onclick: () => { color = c; $$('.sw', cols).forEach(e => e.classList.remove('sel')); b.classList.add('sel'); } }); cols.append(b); });
+    const go = () => { Modal.close(); App.createNotebook({ title: inp.value.trim() || 'Untitled notebook', color, template, paperColor: paper, folderId: Lib.folderId }); };
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    Modal.open({ title: 'New notebook', body: [h('div', { class: 'fl' }, 'Name'), inp, h('div', { class: 'fl' }, 'Cover colour'), cols, h('div', { class: 'fl' }, 'Page template'), tileGrid(template, t => template = t), h('div', { class: 'fl' }, 'Paper'), paperRow(paper, p => paper = p)],
+      footer: [h('button', { class: 'btn', onclick: () => Modal.close() }, 'Cancel'), h('button', { class: 'btn primary', onclick: go, html: ic('plus') + 'Create' })] });
+    setTimeout(() => { inp.focus(); inp.select(); }, 80);
+  },
+  paper() {
+    const nb = Ed.nb, pg = nb.pages[Ed.cur]; let scope = 'all';
+    const seg = h('div', { class: 'seg' }); [['all', 'All pages'], ['page', 'This page only']].forEach(([k, l]) => seg.append(h('button', { class: k === scope ? 'on' : '', onclick: e => { scope = k; $$('button', seg).forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, l)));
+    const tpl = pg.template || nb.template, paper = pg.paperColor || nb.paperColor;
+    Modal.open({ title: 'Paper & template', cls: 'wide', body: [seg, h('div', { class: 'fl' }, 'Template'), tileGrid(tpl, t => Ed.setPaper({ template: t, scope })), h('div', { class: 'fl' }, 'Paper colour'),
+      paperRow(paper, p => { Ed.setPaper({ paperColor: p, scope }); if (isDark(p) && isDark(S.tools.pen.color)) { S.tools.pen.color = '#f8fafc'; } if (!isDark(p) && S.tools.pen.color === '#f8fafc') S.tools.pen.color = '#111827'; UI.syncInk(); UI.saveUiState(); })] });
+  },
+  overview() {
+    const nb = Ed.nb, grid = h('div', { class: 'pgrid' });
+    const build = () => {
+      grid.innerHTML = '';
+      nb.pages.forEach((p, i) => {
+        const img = h('img', { alt: 'Page ' + (i + 1) }), th = h('div', { class: 'th' }, img);
+        th.addEventListener('click', () => { Modal.close(); Ed.scrollToPage(i); });
+        const acts = h('div', { class: 'prow', style: 'justify-content:center;gap:2px;display:none' },
+          ...[['copy', 'Duplicate', () => Ed.duplicatePage(i)], ['chevL', 'Move earlier', () => Ed.movePage(i, -1)], ['chevR', 'Move later', () => Ed.movePage(i, 1)], ['trash', 'Delete', () => Dialogs.confirm({ title: 'Delete page ' + (i + 1) + '?', msg: 'This removes the page and its ink. You can undo right after.', ok: 'Delete', danger: true }).then(y => { if (y) { Ed.deletePage(i); Dialogs.overview(); } })]]
+            .map(([ico, lab, fn]) => h('button', { class: 'ibtn', style: 'width:36px;height:36px', 'aria-label': lab, onclick: () => fn(), html: ic(ico) })));
+        const pm = h('button', { class: 'pm', 'aria-label': 'Page actions', html: ic('more'), onclick: e => { e.stopPropagation(); acts.style.display = acts.style.display === 'none' ? 'flex' : 'none'; } });
+        grid.append(h('div', { class: 'pcard' + (i === Ed.cur ? ' cur' : '') }, h('div', { style: 'position:relative;width:100%' }, th, pm), h('div', { class: 'n' }, String(i + 1)), acts));
+        UI.thumbAsync(nb, p, img, 260);
+      });
+      grid.append(h('button', { class: 'pcard add', onclick: () => { Ed.addPage(); Modal.close(); } }, h('div', { class: 'th', html: ic('plus') }), h('div', { class: 'n' }, 'New page')));
+    };
+    build(); UI.overviewRefresh = () => { if (!$('#modal').hidden) build(); };
+    Modal.open({ title: `Pages · ${nb.pages.length}`, cls: 'wide', body: grid });
+    setTimeout(() => { const c = $('.pcard.cur', grid); c && c.scrollIntoView({ block: 'center' }); }, 30);
+  },
+  exportSheet() {
+    const nb = Ed.nb, row = (icon, t, s, fn) => h('button', { class: 'mi', style: 'padding:14px 10px', onclick: () => { Modal.close(); fn(); }, html: ic(icon) + `<span><b style="display:block">${t}</b><span style="color:var(--text3);font-size:12.5px">${s}</span></span>` });
+    Modal.open({ title: 'Export', body: [row('file', 'PDF — whole notebook', `${nb.pages.length} page${nb.pages.length > 1 ? 's' : ''}, ready to print or share`, () => App.exportPDF(nb)),
+      row('image', 'PNG — this page', 'High-resolution image of page ' + (Ed.cur + 1), () => App.exportPNG(nb, Ed.cur)),
+      row('download', 'Backup file (.json)', 'Editable copy of this notebook — can be re-imported', () => App.exportJSON(nb))] });
+  },
+  settings() {
+    const body = h('div'); const P = S.prefs;
+    const seg = (k, opts) => { const s = h('div', { class: 'seg', style: 'min-width:240px' }); opts.forEach(([v, l]) => s.append(h('button', { class: P[k] === v ? 'on' : '', onclick: e => { P[k] = v; $$('button', s).forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); if (k === 'theme') UI.applyTheme(); UI.saveUiState(); } }, l))); return s; };
+    const sw = (k) => { const s = h('button', { class: 'switch' + (P[k] ? ' on' : ''), role: 'switch', onclick: () => { P[k] = !P[k]; s.classList.toggle('on', P[k]); UI.saveUiState(); } }); return s; };
+    const row = (t, sub, ctl) => h('div', { class: 'row-opt' }, h('div', { class: 'lbl' }, h('b', null, t), h('span', null, sub)), ctl);
+    body.append(
+      row('Finger behaviour', 'Auto switches fingers to scroll/zoom once a stylus is detected', seg('drawWith', [['auto', 'Auto'], ['pen', 'Pen only'], ['any', 'Pen + finger']])),
+      row('Hide toolbars while writing', 'Bars fade out while ink is flowing, return when you pause', sw('autoHide')),
+      row('Hold to snap shapes', 'Pause at the end of a line or circle and it straightens', sw('holdSnap')),
+      row('Appearance', 'Interface theme (paper colour is set per notebook)', seg('theme', [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']])),
+      h('div', { class: 'fl' }, 'Backup'),
+      h('div', { class: 'prow', style: 'flex-wrap:wrap' }, h('button', { class: 'btn', onclick: () => App.exportAll(), html: ic('download') + 'Back up everything' }), h('button', { class: 'btn', onclick: () => App.pickImport(), html: ic('upload') + 'Restore from file' })),
+      h('p', { class: 'hint' }, 'Notes live inside this browser on this tablet. Back up before clearing browser data or if the server address changes.'));
+    Modal.open({ title: 'Settings', body });
+  },
+  tips() {
+    const li = (i, t, s) => h('div', { class: 'row-opt' }, h('span', { html: ic(i), style: 'color:var(--accent)' }), h('div', { class: 'lbl' }, h('b', null, t), h('span', null, s)));
+    Modal.open({ title: 'Gestures & tips', body: [
+      li('hand', 'Two fingers', 'Pinch to zoom, drag to scroll. A stylus draws, fingers move the page.'),
+      li('pages', 'More pages', 'Scroll to the end of the notebook for “Add page”, or tap the page counter.'),
+      li('eraser', 'Pen side button', 'Hold it to erase without switching tools. Tap the active tool again for size & colour.'),
+      li('sparkle', 'Perfect shapes', 'Draw a line, circle or box and hold still — it snaps. Or switch on Auto-shape.'),
+      li('lasso', 'Select & move', 'Loop around ink with the lasso, then drag it, resize from the corner, recolour or delete.'),
+      li('hide', 'Focus', 'Toolbars fade while you write. Drag the grip to move the toolbar, or collapse it with the arrow.')] });
+  },
+};
+
+'use strict';
+/* ============================================================
+   LIBRARY — notebooks & folders
+   ============================================================ */
+const Lib = {
+  folderId: null, q: '', filter: 'all',
+  open() { Ed.saveView(); $('#library').hidden = false; this.render(); },
+  close() { $('#library').hidden = true; },
+  crumbs() { const out = []; let f = S.folders.find(x => x.id === this.folderId); while (f) { out.unshift(f); f = S.folders.find(x => x.id === f.parentFolderId); } return out; },
+  render() {
+    const root = $('#library'); root.innerHTML = '';
+    const q = this.q.trim().toLowerCase(), searching = !!q;
+    const head = h('div', { class: 'lib-head' });
+    const title = h('div', { class: 'lib-title' });
+    if (S.tabs.length) title.append(h('button', { class: 'ibtn', 'aria-label': 'Back to notebook', onclick: () => this.close(), html: ic('chevL') }));
+    title.append(h('h1', null, 'Library'),
+      h('button', { class: 'btn', onclick: () => App.newFolder(this.folderId), html: ic('folderPlus') + '<span>Folder</span>' }),
+      h('button', { class: 'btn primary', onclick: () => Dialogs.newNotebook(), html: ic('plus') + '<span>Notebook</span>' }),
+      h('button', { class: 'ibtn', 'aria-label': 'Settings', onclick: () => Dialogs.settings(), html: ic('gear') }));
+    const search = h('div', { class: 'search', html: ic('search') }, h('input', { type: 'search', placeholder: 'Search notebooks and folders', value: this.q, 'aria-label': 'Search' }));
+    const inp = $('input', search); inp.addEventListener('input', () => { this.q = inp.value; this.renderBody(); });
+    const chips = h('div', { class: 'chips' }); [['all', 'All'], ['starred', 'Starred'], ['recent', 'Recent']].forEach(([k, l]) => chips.append(h('button', { class: 'chip' + (this.filter === k ? ' on' : ''), onclick: () => { this.filter = k; this.q = ''; this.render(); } }, l)));
+    head.append(title, h('div', { class: 'lib-tools' }, search, chips));
+    this.crumbEl = h('div', { class: 'crumbs' }); head.append(this.crumbEl);
+    this.body = h('div', { class: 'lib-body' }); root.append(head, this.body); this.renderBody();
+  },
+  renderBody() {
+    const q = this.q.trim().toLowerCase(), body = this.body; body.innerHTML = '';
+    const cr = this.crumbEl; cr.innerHTML = '';
+    if (this.filter === 'all' && !q) {
+      const path = this.crumbs();
+      if (path.length) { cr.append(h('button', { onclick: () => { this.folderId = null; this.render(); } }, 'All notebooks')); path.forEach((f, i) => { cr.append(h('span', { class: 'sep' }, '›')); cr.append(i === path.length - 1 ? h('span', { class: 'cur' }, f.name) : h('button', { onclick: () => { this.folderId = f.id; this.render(); } }, f.name)); }); }
+    }
+    let folders = [], nbs = [];
+    if (q) { folders = S.folders.filter(f => f.name.toLowerCase().includes(q)); nbs = S.notebooks.filter(n => n.title.toLowerCase().includes(q)); }
+    else if (this.filter === 'starred') nbs = S.notebooks.filter(n => n.isFavorite);
+    else if (this.filter === 'recent') nbs = S.notebooks.filter(n => n.openedAt).sort((a, b) => b.openedAt - a.openedAt).slice(0, 12);
+    else { folders = S.folders.filter(f => (f.parentFolderId || null) === this.folderId); nbs = S.notebooks.filter(n => (n.folderId || null) === this.folderId); }
+    if (this.filter !== 'recent') nbs = nbs.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+    if (folders.length) {
+      body.append(h('div', { class: 'lib-sec' }, 'Folders')); const g = h('div', { class: 'fgrid' });
+      folders.forEach(f => {
+        const cnt = S.notebooks.filter(n => n.folderId === f.id).length + S.folders.filter(x => x.parentFolderId === f.id).length;
+        const card = h('div', { class: 'fcard', role: 'button', tabindex: 0 }, h('div', { class: 'fi', style: '--fc:' + f.color, html: ic('folder') }), h('div', { class: 'ft' }, h('b', null, f.name), h('small', null, cnt + (cnt === 1 ? ' item' : ' items'))),
+          h('button', { class: 'ibtn', 'aria-label': 'Folder options', html: ic('more'), onclick: e => { e.stopPropagation(); UI.openPopover(e.currentTarget, this.folderMenu(f), { menu: true, below: true }); } }));
+        card.addEventListener('click', () => { this.folderId = f.id; this.q = ''; this.filter = 'all'; this.render(); }); g.append(card);
+      }); body.append(g);
+    }
+    if (nbs.length) {
+      body.append(h('div', { class: 'lib-sec' }, this.filter === 'starred' ? 'Starred' : this.filter === 'recent' ? 'Recently opened' : 'Notebooks')); const g = h('div', { class: 'ngrid' });
+      nbs.forEach(n => {
+        const img = h('img', { alt: '', draggable: 'false' }), star = h('button', { class: 'star' + (n.isFavorite ? ' on' : ''), 'aria-label': 'Star', html: ic('star'), onclick: e => { e.stopPropagation(); n.isFavorite = !n.isFavorite; Persist.nb(n); star.classList.toggle('on', n.isFavorite); } });
+        const card = h('div', { class: 'ncard', role: 'button', tabindex: 0 }, h('div', { class: 'cover', style: '--nc:' + n.color }, img, star),
+          h('div', { class: 'meta' }, h('div', { class: 'tt' }, h('b', null, n.title), h('small', null, `${n.pages.length} page${n.pages.length > 1 ? 's' : ''} · ${ago(n.updatedAt)}`)),
+            h('button', { class: 'ibtn', 'aria-label': 'Notebook options', html: ic('more'), onclick: e => { e.stopPropagation(); UI.openPopover(e.currentTarget, this.nbMenu(n), { menu: true, above: true }); } })));
+        card.addEventListener('click', () => App.open(n.id)); g.append(card); UI.thumbAsync(n, n.pages[0], img, 300);
+      }); body.append(g);
+    }
+    if (!folders.length && !nbs.length) body.append(h('div', { class: 'empty', html: ic('library') + `<div style="font-weight:650;font-size:16px;color:var(--text2)">${q ? 'No matches' : this.filter === 'starred' ? 'No starred notebooks yet' : this.filter === 'recent' ? 'Nothing opened yet' : 'This folder is empty'}</div><div style="margin-top:4px">${q ? 'Try a different search' : 'Tap “Notebook” to start writing'}</div>` }));
+  },
+  nbMenu(n) {
+    const r = h('div'), mi = UI.menuItem.bind(UI);
+    r.append(mi('rename', 'Rename', () => App.rename(n.id)), mi('star', n.isFavorite ? 'Remove star' : 'Add star', () => { n.isFavorite = !n.isFavorite; Persist.nb(n); this.renderBody(); }),
+      mi('move', 'Move to…', () => App.moveTo(n)), mi('copy', 'Duplicate', () => App.duplicateNotebook(n.id)), mi('download', 'Export backup', () => App.exportJSON(n)),
+      h('div', { class: 'mdiv' }), mi('trash', 'Delete', () => App.deleteNotebook(n.id), { danger: true })); return r;
+  },
+  folderMenu(f) {
+    const r = h('div'), mi = UI.menuItem.bind(UI);
+    r.append(mi('rename', 'Rename', () => App.renameFolder(f)), mi('trash', 'Delete folder', () => App.deleteFolder(f), { danger: true })); return r;
+  },
+};
+
+/* ============================================================
+   APP
+   ============================================================ */
+const App = {
+  async boot() {
+    UI.loadUiState(); UI.applyTheme();
+    try { await Store.init(); } catch (e) { }
+    let data = await Store.loadAll(); const byPg = new Map(); (data.pages || []).forEach(p => byPg.set(p.id, p));
+    if (data.nbs && data.nbs.length) {
+      S.notebooks = data.nbs.map(m => ({ ...m, pages: (m.pageIds || []).map(id => byPg.get(id)).filter(Boolean).map(p => ({ id: p.id, strokes: p.strokes || [], ...(p.template ? { template: p.template } : {}), ...(p.paperColor ? { paperColor: p.paperColor } : {}) })) }));
+      S.notebooks.forEach(n => { if (!n.pages.length) n.pages.push(newPage()); });
+      S.folders = data.folders || [];
+    } else {
+      const legacy = migrateLegacy();
+      if (legacy) { S.notebooks = legacy.notebooks; S.folders = legacy.folders; S.notebooks.forEach(n => { Persist.nb(n); n.pages.forEach(p => Persist.page(n, p)); }); Persist.fol(); setTimeout(() => UI.toast('Your earlier notes were imported'), 900); }
+    }
+    UI.init(); Ed.init(); Sel.init(); Persist.flush();
+    S.tabs = S.tabs.filter(id => getNb(id)); if (!getNb(S.activeId)) S.activeId = S.tabs[0] || null;
+    if (!S.notebooks.length) { const nb = newNotebook({ title: 'My first notebook' }); S.notebooks.push(nb); Persist.nb(nb); Persist.page(nb, nb.pages[0]); S.tabs = [nb.id]; S.activeId = nb.id; }
+    if (S.activeId) { this.open(S.activeId); if (!S.prefs.tipsSeen) { S.prefs.tipsSeen = true; UI.saveUiState(); setTimeout(() => Dialogs.tips(), 600); } } else Lib.open();
+    $('#boot').remove();
+    addEventListener('beforeunload', () => { Persist.flush(); Ed.saveView(); UI.saveUiState(); });
+  },
+  open(id) {
+    const nb = getNb(id); if (!nb) return; if (!S.tabs.includes(id)) S.tabs.push(id); S.activeId = id; nb.openedAt = Date.now(); Persist.nb(nb);
+    Lib.close(); Ed.mount(nb); UI.renderTabs(); UI.saveUiState();
+  },
+  closeTab(id) {
+    const i = S.tabs.indexOf(id); if (i < 0) return; S.tabs.splice(i, 1);
+    if (id === S.activeId) { const nx = S.tabs[Math.min(i, S.tabs.length - 1)]; if (nx) this.open(nx); else { S.activeId = null; Ed.saveView(); UI.renderTabs(); Lib.open(); } } else UI.renderTabs();
+    UI.saveUiState();
+  },
+  createNotebook(o) { const nb = newNotebook(o); S.notebooks.push(nb); Persist.nb(nb); Persist.page(nb, nb.pages[0]); this.open(nb.id); },
+  async rename(id) { const nb = getNb(id), v = await Dialogs.ask({ title: 'Rename notebook', value: nb.title }); if (v) { nb.title = v; Persist.nb(nb); UI.renderTabs(); if (!$('#library').hidden) Lib.renderBody(); } },
+  async newFolder(parent) { const v = await Dialogs.ask({ title: 'New folder', value: 'New folder', ok: 'Create' }); if (!v) return; S.folders.push({ id: uid(), name: v, parentFolderId: parent || null, color: COVER_COLORS[S.folders.length % COVER_COLORS.length], createdAt: Date.now() }); Persist.fol(); Lib.renderBody(); },
+  async renameFolder(f) { const v = await Dialogs.ask({ title: 'Rename folder', value: f.name }); if (v) { f.name = v; Persist.fol(); Lib.render(); } },
+  async deleteFolder(f) {
+    const ok = await Dialogs.confirm({ title: 'Delete folder “' + f.name + '”?', msg: 'Notebooks and folders inside will be moved up one level, not deleted.', ok: 'Delete folder', danger: true }); if (!ok) return;
+    S.notebooks.forEach(n => { if (n.folderId === f.id) { n.folderId = f.parentFolderId || null; Persist.nb(n); } }); S.folders.forEach(x => { if (x.parentFolderId === f.id) x.parentFolderId = f.parentFolderId || null; });
+    S.folders = S.folders.filter(x => x !== f); if (Lib.folderId === f.id) Lib.folderId = f.parentFolderId || null; Persist.fol(); Lib.render();
+  },
+  moveTo(n) {
+    const list = h('div'), add = (id, name, depth) => list.append(h('button', { class: 'mi', style: 'padding-left:' + (12 + depth * 22) + 'px', onclick: () => { n.folderId = id; Persist.nb(n); Modal.close(); Lib.renderBody(); UI.toast('Moved to ' + name); }, html: ic(id ? 'folder' : 'library') + `<span>${name}</span>` + ((n.folderId || null) === id ? ic('check') : '') }));
+    add(null, 'All notebooks', 0); const walk = (p, d) => S.folders.filter(f => (f.parentFolderId || null) === p).forEach(f => { add(f.id, f.name, d); walk(f.id, d + 1); }); walk(null, 1);
+    Modal.open({ title: 'Move “' + n.title + '”', cls: 'dialog', body: list });
+  },
+  async deleteNotebook(id) {
+    const nb = getNb(id); if (!nb) return; const ok = await Dialogs.confirm({ title: 'Delete “' + nb.title + '”?', msg: `This notebook and its ${nb.pages.length} page${nb.pages.length > 1 ? 's' : ''} will be removed.`, ok: 'Delete', danger: true }); if (!ok) return;
+    const tabIdx = S.tabs.indexOf(id); S.notebooks = S.notebooks.filter(n => n !== nb); Persist.delNbs.add(id); nb.pages.forEach(p => Persist.pages.delete(p.id)); Persist.kick();
+    if (tabIdx >= 0) { S.tabs.splice(tabIdx, 1); if (S.activeId === id) { S.activeId = null; if (S.tabs.length) { this.open(S.tabs[0]); Lib.open(); } else { UI.renderTabs(); } } else UI.renderTabs(); }
+    Lib.renderBody(); UI.saveUiState();
+    UI.toast('Notebook deleted', { ms: 7000, action: 'Undo', fn: () => { S.notebooks.push(nb); Persist.delNbs.delete(id); Persist.nb(nb); nb.pages.forEach(p => Persist.page(nb, p)); Lib.renderBody(); } });
+  },
+  duplicateNotebook(id) {
+    const n = getNb(id), c = newNotebook({ ...metaOf(n), title: n.title + ' copy', openedAt: 0, isFavorite: false, pages: n.pages.map(p => newPage({ strokes: p.strokes.slice(), ...(p.template ? { template: p.template } : {}), ...(p.paperColor ? { paperColor: p.paperColor } : {}) })) });
+    delete c.pageIds; S.notebooks.push(c); Persist.nb(c); c.pages.forEach(p => Persist.page(c, p)); Lib.renderBody(); UI.toast('Duplicated');
+  },
+  fullscreen() { if (document.fullscreenElement) document.exitFullscreen(); else (document.documentElement.requestFullscreen || (() => { })).call(document.documentElement).catch(() => UI.toast('Full screen is not available here')); },
+
+  /* ----- export ----- */
+  download(blob, name) { const a = h('a', { href: URL.createObjectURL(blob), download: name }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); },
+  safe(t) { return (t || 'notebook').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_') || 'notebook'; },
+  pageCanvas(nb, page, k) { const c = document.createElement('canvas'); c.width = Math.round(PAGE_W * k); c.height = Math.round(PAGE_H * k); const x = c.getContext('2d'); x.scale(k, k); renderPage(x, page, nb); return c; },
+  toBlob(c, type, q) { return new Promise(r => c.toBlob(r, type, q)); },
+  async exportPNG(nb, i) { const b = await this.toBlob(this.pageCanvas(nb, nb.pages[i], 2), 'image/png'); this.download(b, `${this.safe(nb.title)}_p${i + 1}.png`); UI.toast('PNG saved to Downloads'); },
+  async exportPDF(nb) {
+    UI.toast('Building PDF…', { ms: 1500 }); const jpgs = [];
+    for (const p of nb.pages) { const c = this.pageCanvas(nb, p, 1.7), b = await this.toBlob(c, 'image/jpeg', .9); jpgs.push({ w: c.width, h: c.height, data: new Uint8Array(await b.arrayBuffer()) }); await new Promise(r => setTimeout(r, 0)); }
+    this.download(new Blob([buildPdf(jpgs)], { type: 'application/pdf' }), this.safe(nb.title) + '.pdf'); UI.toast('PDF saved to Downloads');
+  },
+  nbJSON(n) { return { ...metaOf(n), pageIds: undefined, pages: n.pages.map(p => ({ id: p.id, strokes: p.strokes, template: p.template, paperColor: p.paperColor })) }; },
+  exportJSON(n) { this.download(new Blob([JSON.stringify({ format: 'notetab-notebook', version: 4, notebook: this.nbJSON(n) })], { type: 'application/json' }), this.safe(n.title) + '.notetab.json'); UI.toast('Backup saved'); },
+  exportAll() { this.download(new Blob([JSON.stringify({ format: 'notetab-backup', version: 4, folders: S.folders, notebooks: S.notebooks.map(n => this.nbJSON(n)) })], { type: 'application/json' }), 'notetab-backup-' + new Date().toISOString().slice(0, 10) + '.json'); UI.toast('Full backup saved'); },
+  pickImport() { const i = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none' }); i.addEventListener('change', async () => { if (i.files[0]) await this.importFile(i.files[0]); i.remove(); }); document.body.append(i); i.click(); },
+  async importFile(file) {
+    try {
+      const j = JSON.parse(await file.text()), fmap = new Map(); let count = 0;
+      const addNb = o => {
+        const pages = (o.pages || []).map(p => Array.isArray(p) ? newPage({ strokes: p }) : newPage({ strokes: p.strokes || [], ...(p.template ? { template: p.template } : {}), ...(p.paperColor ? { paperColor: p.paperColor } : {}) }));
+        const nb = newNotebook({ title: o.title || 'Imported', color: o.color || '#3b5bdb', template: o.template || 'lined', paperColor: o.paperColor || '#ffffff', isFavorite: !!o.isFavorite, folderId: fmap.get(o.folderId) || null, openedAt: 0, pages: pages.length ? pages : [newPage()] });
+        S.notebooks.push(nb); Persist.nb(nb); nb.pages.forEach(p => Persist.page(nb, p)); count++; return nb;
+      };
+      if (j.format === 'notetab-backup') { (j.folders || []).forEach(f => fmap.set(f.id, uid())); (j.folders || []).forEach(f => S.folders.push({ ...f, id: fmap.get(f.id), parentFolderId: fmap.get(f.parentFolderId) || null })); Persist.fol(); (j.notebooks || []).forEach(addNb); }
+      else if (j.format === 'notetab-notebook') addNb(j.notebook);
+      else if (Array.isArray(j)) j.forEach(addNb); else if (j.pages) addNb(j); else throw new Error('Unrecognised file');
+      Modal.close(); Lib.open(); UI.toast(`Imported ${count} notebook${count === 1 ? '' : 's'}`);
+    } catch (e) { UI.toast('That file could not be read'); console.error(e); }
+  },
+};
+
+/* Minimal PDF writer: one JPEG per page (US Letter, same 8.5×11 ratio as the paper) */
+function buildPdf(jpgs) {
+  const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const push = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); len += b.length; };
+  const obj = (n, body) => { offs[n] = len; push(`${n} 0 obj\n`); push(body); push('\nendobj\n'); };
+  push('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'); const N = jpgs.length, kids = jpgs.map((_, i) => `${3 + i * 3} 0 R`).join(' ');
+  obj(1, '<< /Type /Catalog /Pages 2 0 R >>'); obj(2, `<< /Type /Pages /Kids [${kids}] /Count ${N} >>`);
+  jpgs.forEach((j, i) => {
+    const pg = 3 + i * 3, ct = pg + 1, im = pg + 2, cs = 'q 612 0 0 792 0 0 cm /Im0 Do Q';
+    obj(pg, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 ${im} 0 R >> >> /Contents ${ct} 0 R >>`);
+    obj(ct, `<< /Length ${cs.length} >>\nstream\n${cs}\nendstream`);
+    offs[im] = len; push(`${im} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${j.w} /Height ${j.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${j.data.length} >>\nstream\n`); push(j.data); push('\nendstream\nendobj\n');
+  });
+  const total = 3 + N * 3, xr = len; push(`xref\n0 ${total}\n0000000000 65535 f \n`);
+  for (let i = 1; i < total; i++) push(String(offs[i]).padStart(10, '0') + ' 00000 n \n');
+  push(`trailer\n<< /Size ${total} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`);
+  const out = new Uint8Array(len); let o = 0; parts.forEach(p => { out.set(p, o); o += p.length; }); return out;
+}
+
+addEventListener('DOMContentLoaded', () => App.boot().catch(e => { console.error(e); const b = $('#boot'); if (b) b.textContent = 'Could not start: ' + e.message; }));
+
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+name: Build Android APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build Android APK
+        run: |
+          gradle assembleDebug --stacktrace --console=plain > gradle_output.txt 2>&1 || true
+          cat gradle_output.txt
+          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            echo "::error::Build Failed! Inspecting error lines:"
+            grep -E "e: |error:|Compilation error|FAILURE|Caused by" gradle_output.txt | head -n 30 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: note-taking-app-apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            gradle_output.txt
