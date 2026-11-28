@@ -211,18 +211,6 @@ fun NoteTabBar(
                         )
                     }
 
-                    // Add Page Button in top bar
-                    FilledTonalButton(
-                        onClick = onAddNewPage,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .padding(horizontal = 4.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text("Page", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
                 }
             }
 

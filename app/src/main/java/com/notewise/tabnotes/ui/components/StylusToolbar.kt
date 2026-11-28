@@ -2,6 +2,10 @@ package com.notewise.tabnotes.ui.components
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -101,7 +105,7 @@ fun StylusToolbar(
                 ) {
                     // Pen
                     ToolButton(
-                        icon = Icons.Default.Edit,
+                        icon = ToolIcons.Ballpoint,
                         label = "Pen",
                         isSelected = selectedTool == ToolType.PEN,
                         onClick = { onSelectTool(ToolType.PEN) }
@@ -109,7 +113,7 @@ fun StylusToolbar(
 
                     // Fountain Pen
                     ToolButton(
-                        icon = Icons.Default.Brush,
+                        icon = ToolIcons.Fountain,
                         label = "Fountain Pen",
                         isSelected = selectedTool == ToolType.FOUNTAIN_PEN,
                         onClick = { onSelectTool(ToolType.FOUNTAIN_PEN) }
@@ -117,7 +121,7 @@ fun StylusToolbar(
 
                     // Highlighter (Semi-Transparent)
                     ToolButton(
-                        icon = Icons.Default.BorderColor,
+                        icon = ToolIcons.Highlighter,
                         label = "Highlighter",
                         isSelected = selectedTool == ToolType.HIGHLIGHTER,
                         badgeColor = Color(0xFFFFE066),
@@ -133,7 +137,7 @@ fun StylusToolbar(
                     Box {
                         val isEraserActive = selectedTool == ToolType.ERASER_STROKE || selectedTool == ToolType.ERASER_POINT
                         ToolButton(
-                            icon = Icons.Default.AutoFixNormal,
+                            icon = ToolIcons.Eraser,
                             label = if (selectedTool == ToolType.ERASER_POINT) "Precision Eraser" else "Eraser",
                             isSelected = isEraserActive,
                             badgeColor = if (selectedTool == ToolType.ERASER_POINT) Color(0xFF2563EB) else Color(0xFFDC2626),
@@ -179,7 +183,7 @@ fun StylusToolbar(
 
                     // Magic Disappearing Pen (Fading Ink)
                     ToolButton(
-                        icon = Icons.Default.AutoFixHigh,
+                        icon = ToolIcons.MagicWand,
                         label = "Magic Pen",
                         isSelected = selectedTool == ToolType.MAGIC_PEN,
                         badgeColor = Color(0xFF8B5CF6),
@@ -312,7 +316,7 @@ fun StylusToolbar(
 
                     // Lasso / Selection Tool
                     ToolButton(
-                        icon = Icons.Default.Gesture,
+                        icon = ToolIcons.Lasso,
                         label = "Lasso Selection",
                         isSelected = selectedTool == ToolType.LASSO,
                         onClick = { onSelectTool(ToolType.LASSO) }
@@ -320,7 +324,7 @@ fun StylusToolbar(
 
                     // Text Tool
                     ToolButton(
-                        icon = Icons.Default.TextFields,
+                        icon = ToolIcons.Text,
                         label = "Text",
                         isSelected = selectedTool == ToolType.TEXT,
                         onClick = { onSelectTool(ToolType.TEXT) }
@@ -914,26 +918,44 @@ private fun ToolButton(
     badgeColor: Color? = null,
     onClick: () -> Unit
 ) {
+    val container by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        label = "toolBackground"
+    )
+    val tint by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        label = "toolTint"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.08f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        label = "toolScale"
+    )
     FilledTonalIconButton(
         onClick = onClick,
         colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-            contentColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = container,
+            contentColor = tint
         ),
-        modifier = Modifier.size(38.dp)
+        modifier = Modifier
+            .size(40.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp)
             )
             badgeColor?.let { color ->
                 Box(
                     modifier = Modifier
                         .size(6.dp)
                         .align(Alignment.TopEnd)
-                        .offset(x = 2.dp, y = (-2).dp)
+                        .offset(x = 3.dp, y = (-3).dp)
                         .clip(CircleShape)
                         .background(color)
                 )

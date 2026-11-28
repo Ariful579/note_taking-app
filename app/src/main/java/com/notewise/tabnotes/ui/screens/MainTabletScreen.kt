@@ -1110,11 +1110,11 @@ fun MainTabletScreen(
                                             Toast.makeText(context, "Page $newTotalPages added", Toast.LENGTH_SHORT).show()
                                         },
                                         shape = RoundedCornerShape(24.dp),
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        shadowElevation = 5.dp,
+                                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                                        shadowElevation = 2.dp,
                                         border = androidx.compose.foundation.BorderStroke(
-                                            1.5.dp,
-                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                                            1.dp,
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                                         ),
                                         modifier = Modifier.layout { measurable, constraints ->
                                             val placeable = measurable.measure(constraints)
@@ -1131,48 +1131,59 @@ fun MainTabletScreen(
                                             Icon(
                                                 imageVector = Icons.Default.Add,
                                                 contentDescription = "Add New Page",
-                                                tint = MaterialTheme.colorScheme.primary,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(20.dp)
                                             )
                                             Text(
-                                                text = "Add Page (${editorState.pageCount + 1})",
+                                                text = "Add page",
                                                 fontSize = 13.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
                                     }
                                 }
 
-                                // 9. Floating Tablet Page Navigator (Bottom Center)
-                                PageNavigator(
-                                    currentPage = editorState.pageIndex,
-                                    totalPages = editorState.pageCount,
-                                    onPreviousPage = {
-                                        val prevIdx = (editorState.pageIndex - 1).coerceAtLeast(0)
-                                        editorViewModel.goToPage(prevIdx)
-                                        val targetPanY = (maxPanY - prevIdx * pageStride * zoom).coerceIn(minPanY, maxPanY)
-                                        coroutineScope.launch {
-                                            androidx.compose.animation.core.Animatable(panOffset.y).animateTo(targetPanY, androidx.compose.animation.core.tween(350)) {
-                                                panOffset = Offset(panOffset.x, this.value)
-                                            }
-                                        }
-                                    },
-                                    onNextPage = {
-                                        val nextIdx = (editorState.pageIndex + 1).coerceAtMost(editorState.pageCount - 1)
-                                        editorViewModel.goToPage(nextIdx)
-                                        val targetPanY = (maxPanY - nextIdx * pageStride * zoom).coerceIn(minPanY, maxPanY)
-                                        coroutineScope.launch {
-                                            androidx.compose.animation.core.Animatable(panOffset.y).animateTo(targetPanY, androidx.compose.animation.core.tween(350)) {
-                                                panOffset = Offset(panOffset.x, this.value)
-                                            }
-                                        }
-                                    },
-                                    onAddPage = { editorViewModel.addNewPage() },
+                                // 9. Floating page navigator: appears only while scrolling / changing page, then fades away
+                                var navVisible by remember { mutableStateOf(false) }
+                                LaunchedEffect(editorState.pageIndex, panOffset, zoom) {
+                                    navVisible = true
+                                    delay(1800)
+                                    navVisible = false
+                                }
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = navVisible,
+                                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+                                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { it / 2 },
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 24.dp)
-                                )
+                                ) {
+                                    PageNavigator(
+                                        currentPage = editorState.pageIndex,
+                                        totalPages = editorState.pageCount,
+                                        onPreviousPage = {
+                                            val prevIdx = (editorState.pageIndex - 1).coerceAtLeast(0)
+                                            editorViewModel.goToPage(prevIdx)
+                                            val targetPanY = (maxPanY - prevIdx * pageStride * zoom).coerceIn(minPanY, maxPanY)
+                                            coroutineScope.launch {
+                                                androidx.compose.animation.core.Animatable(panOffset.y).animateTo(targetPanY, androidx.compose.animation.core.tween(350)) {
+                                                    panOffset = Offset(panOffset.x, this.value)
+                                                }
+                                            }
+                                        },
+                                        onNextPage = {
+                                            val nextIdx = (editorState.pageIndex + 1).coerceAtMost(editorState.pageCount - 1)
+                                            editorViewModel.goToPage(nextIdx)
+                                            val targetPanY = (maxPanY - nextIdx * pageStride * zoom).coerceIn(minPanY, maxPanY)
+                                            coroutineScope.launch {
+                                                androidx.compose.animation.core.Animatable(panOffset.y).animateTo(targetPanY, androidx.compose.animation.core.tween(350)) {
+                                                    panOffset = Offset(panOffset.x, this.value)
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
                             }
 
                             // 2. Right-Hand Slide-Out Vertical Page Thumbnail Strip (matching uploaded photo!)

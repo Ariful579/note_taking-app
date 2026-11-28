@@ -3,16 +3,16 @@ package com.notewise.tabnotes.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Notewise Brand & Primary Colors
-val NotewiseBlue = Color(0xFF2563EB)
-val NotewiseBlueLight = Color(0xFF60A5FA)
-val NotewiseBlueDark = Color(0xFF1E40AF)
-val CobaltPrimary = Color(0xFF1D4ED8)
+val NotewiseBlue = Color(0xFF3B5BDB)
+val NotewiseBlueLight = Color(0xFF7B93FF)
+val NotewiseBlueDark = Color(0xFF2B44B5)
+val CobaltPrimary = Color(0xFF4C6EF5)
 
 // Neutral & Backgrounds
-val CanvasBackground = Color(0xFFF1F5F9)
+val CanvasBackground = Color(0xFFE8ECF3)
 val SurfaceLight = Color(0xFFFFFFFF)
 val SurfaceSubtle = Color(0xFFF8FAFC)
-val BorderSubtle = Color(0xFFE2E8F0)
+val BorderSubtle = Color(0xFFDDE2EC)
 val TextPrimary = Color(0xFF0F172A)
 val TextSecondary = Color(0xFF475569)
 val TextMuted = Color(0xFF94A3B8)

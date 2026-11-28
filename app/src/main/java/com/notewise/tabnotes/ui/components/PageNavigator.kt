@@ -24,7 +24,7 @@ fun PageNavigator(
     totalPages: Int,
     onPreviousPage: () -> Unit,
     onNextPage: () -> Unit,
-    onAddPage: () -> Unit,
+    onAddPage: () -> Unit = {},   // kept for compatibility; adding pages now lives at the end of the notebook
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -80,24 +80,6 @@ fun PageNavigator(
                     tint = if (currentPage < totalPages - 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
                     modifier = Modifier.size(16.dp)
                 )
-            }
-
-            VerticalDivider(modifier = Modifier.height(20.dp).padding(horizontal = 2.dp))
-
-            // Add Page "+" Button (creates and switches to new page)
-            FilledTonalButton(
-                onClick = onAddPage,
-                shape = RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add New Page",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("New Page", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
